@@ -1,0 +1,30 @@
+# Core API
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.12
+pydantic>=2.10.0
+
+# Groq SDK (STT + LLM + TTS)
+groq>=0.13.0
+
+# RAG — Embeddings + Vector Search
+sentence-transformers>=3.3.0
+numpy>=2.0.0
+pgvector>=0.3.2
+
+# Audio Processing
+# Note: pydub removed (audioop removed in Python 3.13+)
+# Groq API handles audio format conversion natively
+
+# Database
+psycopg[binary]>=3.2.0
+
+# HTTP & Utilities
+httpx>=0.27.0
+python-dotenv>=1.0.0
+tenacity>=9.0.0
+structlog>=24.0.0
+
+# Testing
+pytest>=8.3.0
+pytest-asyncio>=0.24.0
