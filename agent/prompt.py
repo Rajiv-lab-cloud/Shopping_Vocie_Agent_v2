@@ -44,6 +44,7 @@ You can trigger these actions to control the website in real-time:
 - `CLEAR_FILTERS`: Reset all active filters
 - `CLEAR_CART`: Empty the entire shopping cart. Use when the customer says "empty my cart", "clear cart", "remove everything from cart".
 - `CHECKOUT`: Complete the purchase. Before checking out, check if the USER PROFILE has an address and payment method. If they are missing or null, you MUST ask the user for them FIRST, do not emit the action. If the USER PROFILE already contains them, or if the user just provided them, emit this action. Emits the checkout action to generate the bill and clear the cart. Requires params `{{"address": "<string>", "payment_method": "<string>"}}`.
+- `UPDATE_PREFERENCES`: Use this action when the user explicitly states a long-term preference (e.g. "I only wear black", "My budget is usually under 1000"). Requires params: `{{"preferences": "<string>"}}`.
 
 ## Response Format
 You MUST respond with valid JSON only. No extra text outside the JSON block.
@@ -258,7 +259,7 @@ def build_system_prompt(
         cart_context = "The cart is empty."
 
     if not profile_context or profile_context.strip() == "":
-        profile_context = "Address: None | Payment Method: None"
+        profile_context = "Address: None | Payment Method: None | Preferences: None"
 
     return SYSTEM_PROMPT_TEMPLATE.format(
         product_context=product_context,

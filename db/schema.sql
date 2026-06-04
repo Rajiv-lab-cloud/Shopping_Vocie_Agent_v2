@@ -41,5 +41,6 @@ CREATE TABLE IF NOT EXISTS cart (
 CREATE TABLE IF NOT EXISTS user_profile (
     id              SERIAL PRIMARY KEY,
     address         TEXT,
-    payment_method  TEXT
+    payment_method  TEXT,
+    preferences     TEXT
 );

@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -229,9 +229,41 @@ async def shop_stream(
             skip_tts=skip_tts,
             conversation_history=parsed_history,
         ):
-            yield f"data: {event}"
+            yield f"data: {json.dumps(event)}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@app.websocket("/ws/chat")
+async def websocket_chat(websocket: WebSocket):
+    """Bi-directional WebSocket for real-time voice shopping."""
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            payload = json.loads(data)
+            
+            text_input = payload.get("text")
+            audio_b64 = payload.get("audio_b64")
+            audio_bytes = None
+            if audio_b64:
+                import base64
+                audio_bytes = base64.b64decode(audio_b64)
+            
+            # For simplicity, we assume conversation history is passed per request
+            # In a real app, we could manage it in memory or Postgres.
+            raw_history = payload.get("conversation_history", [])
+            parsed_history = _parse_conversation_history(json.dumps(raw_history))
+            
+            for event in orchestrator.run_stream(
+                audio_bytes=audio_bytes,
+                text_input=text_input,
+                audio_filename="audio.wav",
+                skip_tts=payload.get("skip_tts", False),
+                conversation_history=parsed_history,
+            ):
+                await websocket.send_json(event)
+    except WebSocketDisconnect:
+        logger.info("WebSocket disconnected")
 
 
 def _parse_conversation_history(raw_history: Optional[str]) -> list[dict[str, str]]:

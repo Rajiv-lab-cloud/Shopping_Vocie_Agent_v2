@@ -20,7 +20,7 @@ from typing import Any, Generator, Optional
 from agent import guardrails, llm, rag, stt, tts
 from agent.guardrails import InputGuardrailError, OutputGuardrailError
 from agent.prompt import format_cart_for_prompt
-from db.database import get_cart_items, get_user_profile
+from db.database import get_cart_items, get_user_profile, update_user_preferences
 
 logger = logging.getLogger(__name__)
 
@@ -85,10 +85,16 @@ def run(
     # Stage 3: RAG Retrieval
     t = time.perf_counter()
     try:
+        profile = get_user_profile()
+        prefs = profile.get("preferences")
+        rag_query = safe_transcript
+        if prefs:
+            rag_query = f"{safe_transcript} (User preferences: {prefs})"
+            
         # Extract price constraints once, reuse for RAG filter + LLM prompt
-        price_constraints = rag.extract_price_constraints(safe_transcript)
+        price_constraints = rag.extract_price_constraints(rag_query)
         retrieved_products = rag.retrieve(
-            safe_transcript, price_constraints=price_constraints
+            rag_query, price_constraints=price_constraints
         )
     except Exception as exc:
         logger.error("PIPELINE | RAG failed: %s", exc)
@@ -114,7 +120,7 @@ def run(
     cart_context = format_cart_for_prompt(get_cart_items())
 
     profile = get_user_profile()
-    profile_context = f"Address: {profile.get('address') or 'None'} | Payment Method: {profile.get('payment_method') or 'None'}"
+    profile_context = f"Address: {profile.get('address') or 'None'} | Payment Method: {profile.get('payment_method') or 'None'} | Preferences: {profile.get('preferences') or 'None'}"
 
     llm_response = llm.generate_response(
         safe_transcript,
@@ -150,6 +156,13 @@ def run(
                 }
             ],
         }
+    
+    for action in llm_response.get("ui_actions", []):
+        if action.get("action") == "UPDATE_PREFERENCES":
+            prefs = action.get("params", {}).get("preferences")
+            if prefs:
+                update_user_preferences(prefs)
+
     timings["llm_ms"] = _ms(t)
 
     # Stage 5: Output Guardrails
@@ -242,30 +255,20 @@ def run_stream(
         try:
             transcript = stt.transcribe(audio_bytes, audio_filename)
         except RuntimeError as exc:
-            yield json.dumps({"event": "error", "data": {"error": str(exc)}}) + "\n\n"
+            yield {"event": "error", "data": {"error": str(exc)}}
             return
     else:
-        yield (
-            json.dumps(
-                {
-                    "event": "error",
-                    "data": {"error": "No audio or text input provided."},
-                }
-            )
-            + "\n\n"
-        )
+        yield {"event": "error", "data": {"error": "No audio or text input provided."}}
         return
 
-    yield (
-        json.dumps({"event": "transcript", "data": {"transcript": transcript}}) + "\n\n"
-    )
+    yield {"event": "transcript", "data": {"transcript": transcript}}
 
     # Stage 2: Input Guardrails
     try:
         safe_transcript = guardrails.validate_input(transcript)
     except InputGuardrailError as exc:
         msg = str(exc)
-        yield json.dumps({"event": "actions", "data": {"ui_actions": []}}) + "\n\n"
+        yield {"event": "actions", "data": {"ui_actions": []}}
 
         audio_b64 = ""
         if not skip_tts:
@@ -273,22 +276,20 @@ def run_stream(
                 audio_b64 = tts.synthesize_b64(msg)
             except Exception:
                 pass
-        yield (
-            json.dumps(
-                {
-                    "event": "audio",
-                    "data": {"response_text": msg, "audio_b64": audio_b64},
-                }
-            )
-            + "\n\n"
-        )
+        yield {"event": "audio", "data": {"response_text": msg, "audio_b64": audio_b64}}
         return
 
     # Stage 3: RAG
     try:
-        price_constraints = rag.extract_price_constraints(safe_transcript)
+        profile = get_user_profile()
+        prefs = profile.get("preferences")
+        rag_query = safe_transcript
+        if prefs:
+            rag_query = f"{safe_transcript} (User preferences: {prefs})"
+            
+        price_constraints = rag.extract_price_constraints(rag_query)
         retrieved_products = rag.retrieve(
-            safe_transcript, price_constraints=price_constraints
+            rag_query, price_constraints=price_constraints
         )
     except Exception as exc:
         logger.error("PIPELINE | RAG failed: %s", exc)
@@ -296,6 +297,9 @@ def run_stream(
         price_constraints = {}
 
     # Stage 4: LLM
+    profile = get_user_profile()
+    profile_context = f"Address: {profile.get('address') or 'None'} | Payment Method: {profile.get('payment_method') or 'None'} | Preferences: {profile.get('preferences') or 'None'}"
+    
     cart_context = format_cart_for_prompt(get_cart_items())
     llm_response = llm.generate_response(
         safe_transcript,
@@ -303,6 +307,7 @@ def run_stream(
         conversation_history=conversation_history or [],
         price_constraints=price_constraints,
         cart_context=cart_context,
+        profile_context=profile_context,
     )
 
     # If the LLM tried to search for products but we found none, it shouldn't filter the UI
@@ -332,6 +337,12 @@ def run_stream(
                 }
             ],
         }
+
+    for action in llm_response.get("ui_actions", []):
+        if action.get("action") == "UPDATE_PREFERENCES":
+            prefs = action.get("params", {}).get("preferences")
+            if prefs:
+                update_user_preferences(prefs)
 
     # Stage 5: Output Guardrails
     try:
@@ -365,15 +376,7 @@ def run_stream(
         }
 
     # Yield actions so UI can update immediately
-    yield (
-        json.dumps(
-            {
-                "event": "actions",
-                "data": {"ui_actions": validated.get("ui_actions", [])},
-            }
-        )
-        + "\n\n"
-    )
+    yield {"event": "actions", "data": {"ui_actions": validated.get("ui_actions", [])}}
 
     # Stage 6: TTS
     audio_b64 = ""
@@ -384,18 +387,13 @@ def run_stream(
             logger.error("PIPELINE | TTS failed: %s — continuing without audio.", exc)
 
     # Yield audio
-    yield (
-        json.dumps(
-            {
-                "event": "audio",
-                "data": {
-                    "response_text": validated["response_text"],
-                    "audio_b64": audio_b64,
-                },
-            }
-        )
-        + "\n\n"
-    )
+    yield {
+        "event": "audio",
+        "data": {
+            "response_text": validated["response_text"],
+            "audio_b64": audio_b64,
+        },
+    }
 
 
 # Helpers

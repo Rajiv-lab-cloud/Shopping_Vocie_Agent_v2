@@ -191,14 +191,14 @@ def clear_cart() -> None:
 
 
 def get_user_profile() -> dict:
-    """Return the current user profile (address, payment_method)."""
+    """Return the current user profile (address, payment_method, preferences)."""
     with get_db() as conn:
         row = conn.execute(
-            "SELECT address, payment_method FROM user_profile WHERE id = 1"
+            "SELECT address, payment_method, preferences FROM user_profile WHERE id = 1"
         ).fetchone()
         if row:
             return row
-        return {"address": None, "payment_method": None}
+        return {"address": None, "payment_method": None, "preferences": None}
 
 
 def update_user_profile(address: str, payment_method: str) -> None:
@@ -214,4 +214,19 @@ def update_user_profile(address: str, payment_method: str) -> None:
             conn.execute(
                 "INSERT INTO user_profile (id, address, payment_method) VALUES (1, %s, %s)",
                 (address, payment_method),
+            )
+
+def update_user_preferences(preferences: str) -> None:
+    """Update the user's long-term preferences."""
+    with get_db() as conn:
+        row = conn.execute("SELECT id FROM user_profile WHERE id = 1").fetchone()
+        if row:
+            conn.execute(
+                "UPDATE user_profile SET preferences = %s WHERE id = 1",
+                (preferences,),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO user_profile (id, preferences) VALUES (1, %s)",
+                (preferences,),
             )
