@@ -277,6 +277,15 @@ button {
   transform: scale(0.95);
 }
 
+/* Invisible helper to expand clickable area without changing visual size */
+.voice-orb::after {
+  content: '';
+  position: absolute;
+  inset: -15px;
+  border-radius: 50%;
+  background: transparent;
+}
+
 /* Base glowing aura */
 .voice-orb::before {
   content: '';

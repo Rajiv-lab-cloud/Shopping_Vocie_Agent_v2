@@ -153,9 +153,6 @@ def run(
     if not retrieved_products and llm_response.get("intent") == "product_search":
         llm_response["ui_actions"] = []
         llm_response["intent"] = "out_of_stock"
-        llm_response["response_text"] = (
-            "I'm sorry, I couldn't find any products matching your request in our current inventory."
-        )
 
     if llm_response.get("intent") == "out_of_stock":
         llm_response["ui_actions"] = []
@@ -336,9 +333,6 @@ def run_stream(
     if not retrieved_products and llm_response.get("intent") == "product_search":
         llm_response["ui_actions"] = []
         llm_response["intent"] = "out_of_stock"
-        llm_response["response_text"] = (
-            "I'm sorry, I couldn't find any products matching your request in our current inventory."
-        )
 
     if llm_response.get("intent") == "out_of_stock":
         llm_response["ui_actions"] = []
