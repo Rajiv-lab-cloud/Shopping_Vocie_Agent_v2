@@ -36,11 +36,11 @@ function Navbar({ cartCount, setView, onSearch }) {
   return (
     <nav className="navbar glass-nav">
       <div className="nav-brand" onClick={() => setView('home')}>
-        <Package size={28} color="#8b5cf6" />
+        <Package size={28} color="var(--accent)" />
         AI-KART V2
       </div>
       <div className="nav-search">
-        <Search size={18} color="#94a3b8" />
+        <Search size={18} color="var(--text-secondary)" />
         <input 
           type="text" 
           placeholder="Ask ShopBot to find products..." 
@@ -50,7 +50,7 @@ function Navbar({ cartCount, setView, onSearch }) {
         />
       </div>
       <div style={{display: 'flex', gap: '1rem'}}>
-        <button className="btn-primary glass" style={{background: 'transparent'}} onClick={() => setView('cart')}>
+        <button className="btn-primary glass" style={{background: 'transparent', color: 'var(--text-primary)'}} onClick={() => setView('cart')}>
           <ShoppingBag size={20} />
           Cart
           {cartCount > 0 && <span style={{background: '#ef4444', color: '#fff', borderRadius: '50%', padding: '2px 8px', fontSize: '0.8rem'}}>{cartCount}</span>}
@@ -122,7 +122,7 @@ function VoiceOrb({ onNavigate, onAddToCart, onUpdateCartQuantity, onRemoveFromC
     };
     connectWs();
     return () => { if(ws.current) ws.current.close(); };
-  }, [products]); // Rebind when products update for ADD_TO_CART lookups
+  }, []); // Rebind only on mount to prevent websocket reconnects
 
   const handleServerEvent = (data) => {
     if (data.event === "transcript") {
@@ -136,8 +136,7 @@ function VoiceOrb({ onNavigate, onAddToCart, onUpdateCartQuantity, onRemoveFromC
         const params = act.params || {};
         if (act.action === "NAVIGATE_TO") onNavigate(params.page || 'home');
         else if (act.action === "ADD_TO_CART" && params.product_id) {
-          const product = products.find(p => p.id === params.product_id);
-          if (product) onAddToCart(product, params.quantity || 1);
+          onAddToCart({ id: params.product_id }, params.quantity || 1);
         } 
         else if (act.action === "UPDATE_CART_QUANTITY" && params.product_id) onUpdateCartQuantity(params.product_id, params.quantity);
         else if (act.action === "REMOVE_FROM_CART" && params.product_id) onRemoveFromCart(params.product_id);
@@ -281,6 +280,16 @@ export default function App() {
   const removeCart = (cid) => fetch(`${API_BASE}/v1/cart/${cid}`, { method: 'DELETE' }).then(loadCart);
   const clearCart = () => fetch(`${API_BASE}/v1/cart`, { method: 'DELETE' }).then(loadCart);
 
+  const removeCartByProductId = async (pid) => {
+    const res = await fetch(`${API_BASE}/v1/cart`);
+    const cart = await res.json();
+    const item = cart.find(x => x.id === pid);
+    if (item) {
+      await fetch(`${API_BASE}/v1/cart/${item.cart_id}`, { method: 'DELETE' });
+      loadCart();
+    }
+  };
+
   const handleNavigate = (target) => {
     let clean = (target || '').toLowerCase().replace('category/', '').trim();
     if (clean === 'home' || clean === 'cart') { setView(clean); return; }
@@ -330,7 +339,7 @@ export default function App() {
       
       {view === 'detail' && selectedProduct && (
         <div style={{padding: '4rem 2rem', maxWidth: '1000px', margin: '0 auto'}}>
-          <button className="glass" style={{padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer', border: 'none', color: 'white', marginBottom: '2rem'}} onClick={() => setView('home')}><ArrowLeft size={20} /></button>
+          <button className="glass" style={{padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer', border: 'none', color: 'var(--text-primary)', marginBottom: '2rem'}} onClick={() => setView('home')}><ArrowLeft size={20} /></button>
           <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem'}}>
             <img src={parseImage(selectedProduct.image_url) || "https://placehold.co/600"} style={{width: '100%', borderRadius: '16px'}} alt=""/>
             <div>
@@ -346,22 +355,25 @@ export default function App() {
       {view === 'cart' && (
         <div style={{padding: '4rem 2rem', maxWidth: '800px', margin: '0 auto'}}>
           <h1 style={{marginBottom: '2rem'}}>Shopping Cart</h1>
-          {cartItems.map(item => (
-            <div key={item.cart_id} className="glass" style={{padding: '1rem', display: 'flex', gap: '2rem', marginBottom: '1rem', borderRadius: '12px'}}>
+          {cartItems.map(item => {
+            const imgUrl = parseImage(item.image_url);
+            return (
+            <div key={item.cart_id} className="glass" style={{padding: '1rem', display: 'flex', gap: '2rem', marginBottom: '1rem', borderRadius: '12px', alignItems: 'center'}}>
+              <img src={imgUrl || "https://placehold.co/400?text=No+Image"} alt={item.name} style={{width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px'}} />
               <div style={{flex: 1}}>
                 <h3 style={{fontSize: '1.2rem', marginBottom: '0.5rem'}}>{item.name}</h3>
                 <p>Qty: {item.quantity} | ₹{(item.price * item.quantity).toFixed(2)}</p>
               </div>
-              <button style={{background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer'}} onClick={() => removeCart(item.cart_id)}>Remove</button>
+              <button style={{background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontWeight: 'bold'}} onClick={() => removeCart(item.cart_id)}>Remove</button>
             </div>
-          ))}
+          )})}
           {cartItems.length > 0 && <button className="btn-primary" style={{marginTop: '2rem'}} onClick={() => handleNavigate('checkout')}>Proceed to Checkout</button>}
         </div>
       )}
       
       <VoiceOrb 
         onNavigate={handleNavigate} onAddToCart={addToCart} onUpdateCartQuantity={updateCart}
-        onRemoveFromCart={(pid) => { const i = cartItems.find(x=>x.id===pid); if(i) removeCart(i.cart_id); }}
+        onRemoveFromCart={removeCartByProductId}
         onClearCart={clearCart} onFilterCategory={(c) => {setSelectedCategory(c); setView('home');}}
         onSelectProductById={(id) => {const p = products.find(x=>x.id===id); if(p) {setSelectedProduct(p); setView('detail');}}}
         onShowProducts={handleShowProducts} products={products}

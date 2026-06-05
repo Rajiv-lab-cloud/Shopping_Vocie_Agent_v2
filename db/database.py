@@ -21,7 +21,7 @@ _local = threading.local()
 def _get_connection() -> psycopg.Connection:
     """Return a thread-local Postgres connection, creating one if needed."""
     if not hasattr(_local, "conn") or _local.conn is None or _local.conn.closed:
-        conn = psycopg.connect(config.DATABASE_URL, row_factory=dict_row)
+        conn = psycopg.connect(config.DATABASE_URL, row_factory=dict_row, connect_timeout=3)
         # Ensure extension exists before registering it
         conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
         conn.commit()

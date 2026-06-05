@@ -558,7 +558,7 @@ async def api_checkout_cart(req: CheckoutRequest):
 # Static Files
 
 # Serve new modular frontend as static files (Must be at the bottom to avoid catching API routes)
-_frontend_dir = Path(__file__).parent.parent / "frontend"
+_frontend_dir = Path(__file__).parent.parent / "frontend" / "dist"
 if _frontend_dir.exists():
     app.mount(
         "/", StaticFiles(directory=str(_frontend_dir), html=True), name="frontend"

@@ -135,6 +135,25 @@ def install_dependencies():
     ok("Dependencies installed.")
 
 
+def build_frontend():
+    step("Checking frontend build")
+    frontend_dir = ROOT / "frontend"
+    if (frontend_dir / "package.json").exists() and not (frontend_dir / "dist").exists():
+        warn("Frontend not built — running npm install and npm run build…")
+        cmd = "npm install && npm run build" if sys.platform != "win32" else 'cmd.exe /c "npm install && npm run build"'
+        result = run(
+            cmd,
+            cwd=str(frontend_dir),
+            shell=True,
+            capture_output=False,
+        )
+        if result.returncode != 0:
+            fail("Frontend build failed. Please ensure Node.js is installed.")
+        ok("Frontend built successfully.")
+    elif (frontend_dir / "dist").exists():
+        ok("Frontend build found.")
+
+
 def check_env():
     step("Checking environment configuration")
     env_file = ROOT / ".env"
@@ -177,7 +196,10 @@ def init_database():
 
     from db.database import get_db, init_db
 
-    init_db()
+    try:
+        init_db()
+    except Exception as e:
+        fail(f"Could not connect to the database. Is Docker running?\n     Make sure to start Docker Desktop and run 'docker-compose up -d'.\n     Details: {e}")
 
     with get_db() as conn:
         row = conn.execute("SELECT COUNT(*) FROM products").fetchone()
@@ -303,6 +325,7 @@ def main():
     try:
         check_python()
         install_dependencies()
+        build_frontend()
         check_env()
         init_database()
         print(f"\n  {green('✔')} {bold('All checks passed! Launching server…')}")
