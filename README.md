@@ -78,6 +78,17 @@ Customer Audio (WAV/WebM/MP3)
 
 ---
 
+## 🚀 Upgrades from Version 1 to Version 2
+
+Version 2 introduces several major architectural upgrades to improve performance, scalability, and ease of deployment:
+- **Migration to PostgreSQL & pgvector**: Replaced legacy SQLite and FAISS with an enterprise-grade `pgvector` setup. This allows vector similarity searches and SQL filtering in a single query.
+- **Dockerized Backend Infrastructure**: A fully containerized PostgreSQL database configured with pgvector out of the box. No manual DB setup required.
+- **Modern React + Vite Frontend**: Completely initialized a new frontend project using React and Vite, replacing older basic static HTML/JS rendering.
+- **Automated Build Scripts**: The entry point `run.py` now includes `build_frontend()`, which seamlessly installs and builds the React frontend on startup.
+- **Robust Error Handling & Connections**: Enhanced database and Docker availability checks to provide helpful fail-safe warnings if the environment is not running.
+
+---
+
 ## Quick Start
 
 ### 1. Clone & Install
