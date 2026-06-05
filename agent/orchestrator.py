@@ -25,6 +25,25 @@ from db.database import get_cart_items, get_user_profile, update_user_preference
 logger = logging.getLogger(__name__)
 
 
+def print(*args, **kwargs):
+    """Safely print to stdout, handling encoding issues on Windows."""
+    import sys
+    import builtins
+    try:
+        builtins.print(*args, **kwargs)
+    except UnicodeEncodeError:
+        sep = kwargs.get('sep', ' ')
+        end = kwargs.get('end', '\n')
+        file = kwargs.get('file', sys.stdout)
+        
+        text = sep.join(str(arg) for arg in args)
+        encoding = getattr(file, 'encoding', 'utf-8') or 'utf-8'
+        safe_text = text.encode(encoding, errors='replace').decode(encoding)
+        
+        file.write(safe_text + end)
+        file.flush()
+
+
 def run(
     audio_bytes: Optional[bytes] = None,
     text_input: Optional[str] = None,

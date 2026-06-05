@@ -19,6 +19,7 @@ class UIAction(BaseModel):
         "CLEAR_FILTERS",
         "CLEAR_CART",
         "CHECKOUT",
+        "UPDATE_CART_QUANTITY",
     ] = Field(..., description="UI action type")
     params: dict[str, Any] = Field(default_factory=dict)
 
@@ -34,7 +35,7 @@ class UIAction(BaseModel):
             ):
                 raise ValueError("SHOW_PRODUCTS requires product_ids: list[int]")
 
-        elif action in ("ADD_TO_CART", "SHOW_PRODUCT_DETAIL"):
+        elif action in ("ADD_TO_CART", "SHOW_PRODUCT_DETAIL", "UPDATE_CART_QUANTITY"):
             if not isinstance(params.get("product_id"), int):
                 raise ValueError(f"{action} requires product_id: int")
 
