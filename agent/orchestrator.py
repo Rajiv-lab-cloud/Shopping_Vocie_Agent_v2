@@ -169,14 +169,16 @@ def run(
     t = time.perf_counter()
     try:
         allowed_product_ids = [p["id"] for p in retrieved_products]
-        validated = guardrails.validate_output(llm_response, allowed_product_ids)
-
-        # Check if the LLM hallucinated fake product IDs and they were all blocked
+        
         orig_actions = [
             a.get("action")
             for a in llm_response.get("ui_actions", [])
             if isinstance(a, dict)
         ]
+        
+        validated = guardrails.validate_output(llm_response, allowed_product_ids)
+
+        # Check if the LLM hallucinated fake product IDs and they were all blocked
         val_actions = [a.get("action") for a in validated.get("ui_actions", [])]
         if "SHOW_PRODUCTS" in orig_actions and "SHOW_PRODUCTS" not in val_actions:
             logger.warning(
@@ -347,14 +349,16 @@ def run_stream(
     # Stage 5: Output Guardrails
     try:
         allowed_product_ids = [p["id"] for p in retrieved_products]
-        validated = guardrails.validate_output(llm_response, allowed_product_ids)
-
-        # Check if the LLM hallucinated fake product IDs and they were all blocked
+        
         orig_actions = [
             a.get("action")
             for a in llm_response.get("ui_actions", [])
             if isinstance(a, dict)
         ]
+        
+        validated = guardrails.validate_output(llm_response, allowed_product_ids)
+
+        # Check if the LLM hallucinated fake product IDs and they were all blocked
         val_actions = [a.get("action") for a in validated.get("ui_actions", [])]
         if "SHOW_PRODUCTS" in orig_actions and "SHOW_PRODUCTS" not in val_actions:
             logger.warning(

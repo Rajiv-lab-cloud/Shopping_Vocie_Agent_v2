@@ -227,11 +227,11 @@ Customer: "I only have 300 rupees, show me some food"
 }}
 ```
 
-### Example 10 — Bundle Request (Picnic)
-Customer: "I want to pack things for my picnic, I have a budget of 3000"
+### Example 10 — Bundle Request (Camping Trip)
+Customer: "I want to pack things for my camping trip, I have a budget of 3000"
 ```json
 {{
-  "response_text": "I've put together a fun picnic bundle for you! I found a picnic blanket, some fresh fruits, and snacks. The total comes to around ₹2,500, well under your budget! Shall I add these to your cart?",
+  "response_text": "I've put together a fun camping bundle for you! I found a sturdy tent, a flashlight, and some trail mix. The total comes to around ₹2,500, well under your budget! Shall I add these to your cart?",
   "intent": "product_search",
   "confidence": 0.98,
   "ui_actions": [
