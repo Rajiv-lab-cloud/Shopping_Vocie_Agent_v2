@@ -301,15 +301,24 @@ function VoiceOrb({ onNavigate, onAddToCart, onUpdateCartQuantity, onRemoveFromC
   );
 }
 
-const CATEGORIES = ["All", "Beauty", "Fragrances", "Furniture", "Groceries"];
-
 export default function App() {
+  const [categories, setCategories] = useState(["All"]);
   const [view, setView] = useState('home'); 
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [products, setProducts] = useState([]);
   const [cartItems, setCartItems] = useState([]);
   const [searchResultsIds, setSearchResultsIds] = useState(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/v1/categories`)
+      .then(res => res.json())
+      .then(data => {
+        const names = ["All", ...data.map(c => c.name)];
+        setCategories(names);
+      })
+      .catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (selectedCategory === "Search Results") return;
@@ -341,7 +350,10 @@ export default function App() {
   const handleNavigate = (target) => {
     let clean = (target || '').toLowerCase().replace('category/', '').trim();
     if (clean === 'home' || clean === 'cart') { setView(clean); return; }
-    setSelectedCategory(CATEGORIES.find(c => c.toLowerCase().includes(clean)) || 'All');
+    setCategories(prevCats => {
+      setSelectedCategory(prevCats.find(c => c.toLowerCase().includes(clean)) || 'All');
+      return prevCats;
+    });
     setView('home');
   };
 
@@ -375,7 +387,7 @@ export default function App() {
       
       {view === 'home' && (
         <div style={{padding: '2rem 2rem 0', display: 'flex', gap: '1rem'}}>
-          {CATEGORIES.map(cat => (
+          {categories.map(cat => (
             <button key={cat} onClick={() => setSelectedCategory(cat)} className={`btn-primary ${selectedCategory !== cat ? 'glass' : ''}`} style={selectedCategory !== cat ? {background: 'transparent', color: 'var(--text-secondary)'} : {}}>
               {cat}
             </button>

@@ -7,7 +7,7 @@ SYSTEM_PROMPT_TEMPLATE = """You are ShopBot, a warm, friendly, and conversationa
 
 ## Your Personality
 - Greet customers warmly when they say hello, hi, or hey
-- When customers share feelings or moods, suggest matching products from our categories (Beauty, Fragrances, Furniture, Groceries)
+- When customers share feelings or moods, suggest matching products from our categories (__CATEGORIES_LIST__)
 - Keep conversations natural and flowing — you remember what was just said
 - Use light Indian conversational flair (e.g., "arrey", "great choice yaar", etc.) occasionally
 - Be enthusiastic and encouraging
@@ -31,14 +31,14 @@ SYSTEM_PROMPT_TEMPLATE = """You are ShopBot, a warm, friendly, and conversationa
 9. For pure greetings or small talk, keep ui_actions empty — just have a warm conversation
 9. **PRICE CONSTRAINT (CRITICAL):** If the customer mentions a budget, price limit, or says things like "under X", "below X", "I only have X rupees", you MUST ONLY recommend products whose price is WITHIN their stated budget.
 10. **MULTI-ITEM BUNDLES & BUDGETS:** If the user asks for a bundle, kit, or collection of items for an activity (e.g. "pack things for a picnic", "build a pc", "makeup kit") with a budget, select a combination of multiple items from the retrieved inventory whose **COMBINED TOTAL PRICE** is within the budget constraint. Emit a single `SHOW_PRODUCTS` action with all their IDs. **DO NOT** automatically add the bundle to the cart. Instead, ask the user for permission first (e.g., "Would you like me to add these to your cart?").
-11. **STRICT CATEGORY LIMITATION:** We ONLY sell products in these categories: **Beauty**, **Fragrances**, **Furniture**, and **Groceries**. NEVER suggest or mention products from other categories (such as flowers, books, movies, etc.) since we do not sell them. If the customer asks for something we do not carry (like flowers), politely apologize and warmly suggest looking at a relevant category we *do* carry (e.g., a relaxing perfume from Fragrances or pampering items from Beauty to cheer them up).
+11. **STRICT CATEGORY LIMITATION:** We ONLY sell products in these categories: __CATEGORIES_BOLD_LIST__. NEVER suggest or mention products from other categories (such as flowers, books, movies, etc.) since we do not sell them. If the customer asks for something we do not carry (like flowers), politely apologize and warmly suggest looking at a relevant category we *do* carry (e.g., a relaxing perfume from Fragrances or pampering items from Beauty to cheer them up).
 
 
 ## Available UI Actions
 You can trigger these actions to control the website in real-time:
 - `SHOW_PRODUCTS`: Whenever you present or talk about specific products, you MUST emit this action containing the numeric `id`s of the items you are showing. CRITICAL: ONLY use the exact `id`s explicitly listed in the PRODUCT INVENTORY below. NEVER make up or hallucinate product IDs. If the inventory is empty, DO NOT use this action.
 - `FILTER_PRODUCTS`: Apply filters (category, max_price, min_price, min_rating, brand, tags)
-- `NAVIGATE_TO`: Navigate to a page (home, cart, checkout, category/beauty, category/fragrances, category/furniture, category/groceries)
+- `NAVIGATE_TO`: Navigate to a page (home, cart, checkout, __CATEGORIES_NAV_LIST__)
 - `SORT_PRODUCTS`: Sort by field (price_asc, price_desc, rating, newest)
 - `ADD_TO_CART`: Add a product to the cart. You MUST provide the exact numeric `product_id` (integer) from the PRODUCT INVENTORY. You can also provide an optional `quantity` (integer) parameter if the user asks for multiple items (defaults to 1). Do NOT use string placeholders.
 - `REMOVE_FROM_CART`: Remove a specific product entirely from the cart by `product_id`.
@@ -369,6 +369,43 @@ Now respond to the customer's message below.
 """
 
 
+ACTIVE_SYSTEM_PROMPT = None
+ACTIVE_FALLBACK_CONTEXT = None
+
+def init_dynamic_prompt():
+    global ACTIVE_SYSTEM_PROMPT, ACTIVE_FALLBACK_CONTEXT
+    from db.database import get_db
+    with get_db() as conn:
+        rows = conn.execute("SELECT name, slug FROM categories ORDER BY name ASC").fetchall()
+        categories = [{"name": r["name"], "slug": r["slug"]} for r in rows]
+    
+    cat_names = [c["name"] for c in categories]
+    cat_slugs = [f"category/{c['slug']}" for c in categories]
+    
+    categories_list = ", ".join(cat_names)
+    
+    if len(cat_names) > 1:
+        categories_bold_list = "**" + "**, **".join(cat_names[:-1]) + "**, and **" + cat_names[-1] + "**"
+    elif len(cat_names) == 1:
+        categories_bold_list = "**" + cat_names[0] + "**"
+    else:
+        categories_bold_list = "no categories"
+
+    categories_nav_list = ", ".join(cat_slugs)
+
+    prompt = SYSTEM_PROMPT_TEMPLATE.replace("__CATEGORIES_LIST__", categories_list)
+    prompt = prompt.replace("__CATEGORIES_BOLD_LIST__", categories_bold_list)
+    prompt = prompt.replace("__CATEGORIES_NAV_LIST__", categories_nav_list)
+    
+    ACTIVE_SYSTEM_PROMPT = prompt
+
+    ACTIVE_FALLBACK_CONTEXT = (
+        f"No matching products were retrieved. We strictly only sell items in: {categories_list}. "
+        "Do NOT recommend or mention items we do not sell (e.g. flowers, books, electronics). "
+        "Instead, apologize warmly and guide the customer to look at one of our available categories."
+    )
+
+
 def build_system_prompt(
     product_context: str, cart_context: str = "", profile_context: str = ""
 ) -> str:
@@ -382,12 +419,12 @@ def build_system_prompt(
     Returns:
         Fully assembled system prompt string.
     """
+    global ACTIVE_SYSTEM_PROMPT, ACTIVE_FALLBACK_CONTEXT
+    if ACTIVE_SYSTEM_PROMPT is None:
+        init_dynamic_prompt()
+
     if not product_context or product_context.strip() == "":
-        product_context = (
-            "No matching products were retrieved. We strictly only sell items in: Beauty, Fragrances, Furniture, Groceries. "
-            "Do NOT recommend or mention items we do not sell (e.g. flowers, books, electronics). "
-            "Instead, apologize warmly and guide the customer to look at one of our available categories (like suggesting a nice floral perfume from Fragrances as a mood booster if they asked for flowers/something to cheer them up)."
-        )
+        product_context = ACTIVE_FALLBACK_CONTEXT
 
     if not cart_context or cart_context.strip() == "":
         cart_context = "The cart is empty."
@@ -395,7 +432,7 @@ def build_system_prompt(
     if not profile_context or profile_context.strip() == "":
         profile_context = "Address: None | Payment Method: None | Preferences: None"
 
-    return SYSTEM_PROMPT_TEMPLATE.format(
+    return ACTIVE_SYSTEM_PROMPT.format(
         product_context=product_context,
         cart_context=cart_context,
         profile_context=profile_context,

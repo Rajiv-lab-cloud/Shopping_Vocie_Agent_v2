@@ -78,6 +78,9 @@ async def lifespan(app: FastAPI):
         logger.info("Database empty — seeding with sample products…")
         seed_db()
 
+    from agent import prompt
+    prompt.init_dynamic_prompt()
+
     # Preload RAG embedder and index into memory
     from agent import rag
 
@@ -336,6 +339,19 @@ async def list_products_by_ids(ids: str):
     except Exception as exc:
         logger.error("GET /v1/products/by-ids failed: %s", exc)
         raise HTTPException(status_code=500, detail="Failed to fetch products by IDs.")
+
+
+@app.get("/v1/categories", tags=["Products"])
+async def list_categories():
+    """Return all active category names and slugs from the database."""
+    try:
+        from db.database import get_db
+        with get_db() as conn:
+            rows = conn.execute("SELECT name, slug FROM categories ORDER BY name ASC").fetchall()
+            return [{"name": r["name"], "slug": r["slug"]} for r in rows]
+    except Exception as exc:
+        logger.error("GET /v1/categories failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to fetch categories.")
 
 
 @app.get("/v1/cart", response_model=list[CartItemResponse], tags=["Cart"])
