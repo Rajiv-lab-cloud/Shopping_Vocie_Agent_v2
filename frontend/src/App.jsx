@@ -109,6 +109,7 @@ function VoiceOrb({ onNavigate, onAddToCart, onUpdateCartQuantity, onRemoveFromC
   const mediaRecorder = useRef(null);
   const audioChunks = useRef([]);
   const audioObj = useRef(null);
+  const isPressed = useRef(false);
 
   useEffect(() => {
     const connectWs = () => {
@@ -185,8 +186,13 @@ function VoiceOrb({ onNavigate, onAddToCart, onUpdateCartQuantity, onRemoveFromC
 
   const startRecording = async () => {
     if (state === 'processing') return;
+    isPressed.current = true;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!isPressed.current) {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
       mediaRecorder.current = new MediaRecorder(stream);
       audioChunks.current = [];
 
@@ -205,10 +211,12 @@ function VoiceOrb({ onNavigate, onAddToCart, onUpdateCartQuantity, onRemoveFromC
       if (audioObj.current) audioObj.current.pause();
     } catch (err) {
       setMessage("Mic access denied");
+      isPressed.current = false;
     }
   };
 
   const stopRecording = () => {
+    isPressed.current = false;
     if (mediaRecorder.current && mediaRecorder.current.state === "recording") {
       mediaRecorder.current.stop();
     }

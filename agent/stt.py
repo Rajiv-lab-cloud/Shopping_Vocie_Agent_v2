@@ -102,7 +102,7 @@ def transcribe(audio_bytes: bytes, filename: str = "audio.wav") -> str:
 
     except Exception as exc:
         logger.error("STT | Groq Whisper failed: %s", exc)
-        raise RuntimeError(f"Speech-to-text failed: {exc}") from exc
+        raise RuntimeError("I didn't catch that. Please try again.") from exc
 
 
 def _mime_type(filename: str) -> str:
