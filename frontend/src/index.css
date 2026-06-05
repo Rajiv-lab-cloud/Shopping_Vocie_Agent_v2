@@ -366,16 +366,27 @@ button {
 }
 
 .voice-tooltip {
-  background: var(--surface-dark);
-  padding: 1rem 1.5rem;
-  border-radius: 16px;
-  border: 1px solid var(--border-light);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-  max-width: 300px;
+  background: rgba(252, 251, 248, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 0.85rem 1.75rem;
+  border-radius: 20px;
+  border: 1px solid rgba(184, 144, 101, 0.25);
+  box-shadow: 
+    0 15px 35px rgba(184, 144, 101, 0.12),
+    0 3px 10px rgba(0, 0, 0, 0.04);
+  max-width: 90vw;
+  width: max-content;
   opacity: 0;
   transform: translateY(20px);
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #8c6f4f; /* Modern warm beige/bronze */
+  line-height: 1.45;
+  letter-spacing: -0.2px;
 }
 
 .voice-tooltip.visible {
@@ -386,6 +397,7 @@ button {
 .visualizer {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   height: 24px;
 }

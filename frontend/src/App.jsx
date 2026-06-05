@@ -110,6 +110,8 @@ function VoiceOrb({ onNavigate, onAddToCart, onUpdateCartQuantity, onRemoveFromC
   const audioChunks = useRef([]);
   const audioObj = useRef(null);
   const isPressed = useRef(false);
+  const streamInterval = useRef(null);
+  const vanishTimeout = useRef(null);
 
   useEffect(() => {
     const connectWs = () => {
@@ -123,7 +125,11 @@ function VoiceOrb({ onNavigate, onAddToCart, onUpdateCartQuantity, onRemoveFromC
       ws.current.onclose = () => setTimeout(connectWs, 3000);
     };
     connectWs();
-    return () => { if(ws.current) ws.current.close(); };
+    return () => { 
+      if(ws.current) ws.current.close(); 
+      if(streamInterval.current) clearInterval(streamInterval.current);
+      if(vanishTimeout.current) clearTimeout(vanishTimeout.current);
+    };
   }, []); // Rebind only on mount to prevent websocket reconnects
 
   const handleServerEvent = (data) => {
@@ -167,16 +173,47 @@ function VoiceOrb({ onNavigate, onAddToCart, onUpdateCartQuantity, onRemoveFromC
     } 
     else if (data.event === "audio") {
       const responseText = data.data.response_text || "Done.";
-      setMessage(responseText.length > 80 ? responseText.substring(0, 80) + '...' : responseText);
       setConversationHistory(prev => [...prev.slice(-10), { role: 'assistant', content: responseText }]);
       
+      // Stop any active streaming intervals
+      if (streamInterval.current) clearInterval(streamInterval.current);
+      if (vanishTimeout.current) clearTimeout(vanishTimeout.current);
+
+      // Stream the AI response word-by-word without truncation
+      const words = responseText.split(' ');
+      let wordIdx = 0;
+      setMessage('');
+      
+      streamInterval.current = setInterval(() => {
+        if (wordIdx < words.length) {
+          setMessage(words.slice(0, wordIdx + 1).join(' '));
+          wordIdx++;
+        } else {
+          clearInterval(streamInterval.current);
+        }
+      }, 200); // 200ms per word reveal
+
       const audioB64 = data.data.audio_b64;
       if (audioB64) {
         if (audioObj.current) audioObj.current.pause();
         audioObj.current = new Audio("data:audio/mp3;base64," + audioB64);
         audioObj.current.play();
+
+        // Subtitles vanish 500ms after audio finishes playing
+        audioObj.current.onended = () => {
+          vanishTimeout.current = setTimeout(() => {
+            setState('idle');
+            setMessage('');
+          }, 500);
+        };
+      } else {
+        // Fallback if no audio was generated, vanish after streaming completes + buffer
+        const totalDuration = Math.max(3000, words.length * 200 + 1000);
+        vanishTimeout.current = setTimeout(() => {
+          setState('idle');
+          setMessage('');
+        }, totalDuration);
       }
-      setTimeout(() => setState('idle'), 3000);
     } 
     else if (data.event === "error") {
       setMessage(data.data.error || "Error processing voice.");
@@ -209,6 +246,8 @@ function VoiceOrb({ onNavigate, onAddToCart, onUpdateCartQuantity, onRemoveFromC
       setState('listening');
       setMessage('Listening...');
       if (audioObj.current) audioObj.current.pause();
+      if (streamInterval.current) clearInterval(streamInterval.current);
+      if (vanishTimeout.current) clearTimeout(vanishTimeout.current);
     } catch (err) {
       setMessage("Mic access denied");
       isPressed.current = false;
