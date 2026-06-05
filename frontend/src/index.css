@@ -444,3 +444,41 @@ button {
   border-radius: 24px;
   background: var(--surface-dark);
 }
+
+.category-scroll::-webkit-scrollbar {
+  display: none;
+}
+.category-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Category Tabs */
+.category-tab {
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.6rem 1.25rem;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.category-tab:hover {
+  border-color: var(--border-light);
+  background: var(--surface-light);
+  color: var(--text-primary);
+  transform: translateY(-2px);
+}
+
+.category-tab.active {
+  background-color: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 4px 15px var(--accent-glow);
+  transform: translateY(-2px);
+}

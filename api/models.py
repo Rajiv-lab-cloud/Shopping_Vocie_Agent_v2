@@ -20,6 +20,7 @@ class UIAction(BaseModel):
         "CLEAR_CART",
         "CHECKOUT",
         "UPDATE_CART_QUANTITY",
+        "CLEAR_HISTORY",
     ] = Field(..., description="UI action type")
     params: dict[str, Any] = Field(default_factory=dict)
 

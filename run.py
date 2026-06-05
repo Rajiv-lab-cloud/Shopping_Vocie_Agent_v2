@@ -136,10 +136,10 @@ def install_dependencies():
 
 
 def build_frontend():
-    step("Checking frontend build")
+    step("Building frontend")
     frontend_dir = ROOT / "frontend"
-    if (frontend_dir / "package.json").exists() and not (frontend_dir / "dist").exists():
-        warn("Frontend not built — running npm install and npm run build…")
+    if (frontend_dir / "package.json").exists():
+        warn("Building latest frontend changes (npm install && npm run build)…")
         cmd = "npm install && npm run build" if sys.platform != "win32" else 'cmd.exe /c "npm install && npm run build"'
         result = run(
             cmd,
@@ -150,8 +150,6 @@ def build_frontend():
         if result.returncode != 0:
             fail("Frontend build failed. Please ensure Node.js is installed.")
         ok("Frontend built successfully.")
-    elif (frontend_dir / "dist").exists():
-        ok("Frontend build found.")
 
 
 def check_env():

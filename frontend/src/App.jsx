@@ -149,6 +149,7 @@ function VoiceOrb({ onNavigate, onAddToCart, onUpdateCartQuantity, onRemoveFromC
         else if (act.action === "UPDATE_CART_QUANTITY" && params.product_id) onUpdateCartQuantity(params.product_id, params.quantity);
         else if (act.action === "REMOVE_FROM_CART" && params.product_id) onRemoveFromCart(params.product_id);
         else if (act.action === "CLEAR_CART") onClearCart();
+        else if (act.action === "CLEAR_HISTORY") setConversationHistory([]);
         else if (act.action === "FILTER_PRODUCTS" && params.category) onFilterCategory(params.category);
         else if (act.action === "SHOW_PRODUCT_DETAIL" && params.product_id) onSelectProductById(params.product_id);
         else if (act.action === "SHOW_PRODUCTS") {
@@ -393,9 +394,26 @@ export default function App() {
       <Navbar cartCount={cartItems.length} setView={handleNavigate} onSearch={handleTextSearch} />
       
       {view === 'home' && (
-        <div style={{padding: '2rem 2rem 0', display: 'flex', gap: '1rem'}}>
+        <div 
+          ref={(el) => {
+            if (el) {
+              el.onwheel = (e) => {
+                if (e.deltaY !== 0) {
+                  e.preventDefault();
+                  el.scrollLeft += e.deltaY * 2;
+                }
+              };
+            }
+          }}
+          style={{padding: '2rem 2rem 1rem 2rem', display: 'flex', gap: '1rem', overflowX: 'auto', flexWrap: 'nowrap', WebkitOverflowScrolling: 'touch'}} 
+          className="category-scroll"
+        >
           {categories.map(cat => (
-            <button key={cat} onClick={() => setSelectedCategory(cat)} className={`btn-primary ${selectedCategory !== cat ? 'glass' : ''}`} style={selectedCategory !== cat ? {background: 'transparent', color: 'var(--text-secondary)'} : {}}>
+            <button 
+              key={cat} 
+              onClick={() => setSelectedCategory(cat)} 
+              className={`category-tab ${selectedCategory === cat ? 'active' : ''}`}
+            >
               {cat}
             </button>
           ))}
