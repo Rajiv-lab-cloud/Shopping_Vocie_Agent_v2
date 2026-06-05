@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, Search, ShoppingBag, ArrowLeft, Package } from 'lucide-react';
 
-const API_BASE = "http://localhost:8000";
-const WS_BASE = "ws://localhost:8000";
+const isDev = window.location.port === '5173' || window.location.port === '3000';
+const API_BASE = isDev ? "http://localhost:8000" : window.location.origin;
+const WS_BASE = isDev ? "ws://localhost:8000" : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
 
 // --- Helpers ---
 function parseImage(urlStr) {
