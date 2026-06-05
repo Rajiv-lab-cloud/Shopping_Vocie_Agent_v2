@@ -76,12 +76,12 @@ def seed():
         for cat_slug in categories:
             cat_name = format_category_name(cat_slug)
             conn.execute(
-                "INSERT INTO categories (name, slug) VALUES (%s, %s) ON CONFLICT (slug) DO NOTHING",
+                "INSERT INTO categories (name, slug) VALUES (%s, %s) ON CONFLICT (name) DO NOTHING",
                 (cat_name, cat_slug),
             )
             # Fetch inserted ID
             row = conn.execute(
-                "SELECT id FROM categories WHERE slug = %s", (cat_slug,)
+                "SELECT id FROM categories WHERE name = %s", (cat_name,)
             ).fetchone()
             cat_id_map[cat_slug] = row["id"] if isinstance(row, dict) else row[0]
 

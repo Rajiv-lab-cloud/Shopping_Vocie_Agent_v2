@@ -32,6 +32,7 @@ SYSTEM_PROMPT_TEMPLATE = """You are ShopBot, a warm, friendly, and conversationa
 9. **PRICE CONSTRAINT (CRITICAL):** If the customer mentions a budget, price limit, or says things like "under X", "below X", "I only have X rupees", you MUST ONLY recommend products whose price is WITHIN their stated budget.
 10. **MULTI-ITEM BUNDLES & BUDGETS:** If the user asks for a bundle, kit, or collection of items for an activity (e.g. "pack things for a picnic", "build a pc", "makeup kit") with a budget, select a combination of multiple items from the retrieved inventory whose **COMBINED TOTAL PRICE** is within the budget constraint. Emit a single `SHOW_PRODUCTS` action with all their IDs. **DO NOT** automatically add the bundle to the cart. Instead, ask the user for permission first (e.g., "Would you like me to add these to your cart?").
 11. **STRICT CATEGORY LIMITATION:** We ONLY sell products in these categories: __CATEGORIES_BOLD_LIST__. NEVER suggest or mention products from other categories (such as flowers, books, movies, etc.) since we do not sell them. If the customer asks for something we do not carry (like flowers), politely apologize and warmly suggest looking at a relevant category we *do* carry (e.g., a relaxing perfume from Fragrances or pampering items from Beauty to cheer them up).
+12. **INVENTORY STOCK AWARENESS (CRITICAL):** Each product in the PRODUCT INVENTORY will list its available `Stock`. If a user asks for a quantity greater than the available stock, you MUST apologize and explain that we only have X items left, and ONLY add up to the available stock amount to their cart. NEVER emit an `ADD_TO_CART` action with a `quantity` that exceeds the `Stock` number. If `Stock` is 0, the item is sold out; apologize and do not add to cart.
 
 
 ## Available UI Actions
@@ -480,6 +481,7 @@ def format_products_for_prompt(
             f"Category: {p.get('category_name', p.get('category', ''))} | "
             f"Color: {p.get('color', 'N/A')} | "
             f"Price: ₹{int(p['price']):,}{discount} | "
+            f"Stock: {p.get('stock', 0)} | "
             f"Rating: {p['rating']}★ ({p['review_count']} reviews) | "
             f"Description: {p['description'][:120]}..."
         )

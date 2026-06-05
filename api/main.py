@@ -555,7 +555,8 @@ async def api_checkout_cart(req: CheckoutRequest):
 
         doc.build(elements)
 
-        clear_cart()
+        from db.database import checkout_cart
+        checkout_cart()
 
         from fastapi import Response
 

@@ -322,11 +322,18 @@ export default function App() {
 
   useEffect(() => {
     if (selectedCategory === "Search Results") return;
-    let url = `${API_BASE}/v1/products`;
-    if (selectedCategory && selectedCategory !== "All") {
-      url += `?category=${encodeURIComponent(selectedCategory)}`;
-    }
-    fetch(url).then(res => res.json()).then(setProducts).catch(console.error);
+    
+    const fetchProducts = () => {
+      let url = `${API_BASE}/v1/products`;
+      if (selectedCategory && selectedCategory !== "All") {
+        url += `?category=${encodeURIComponent(selectedCategory)}`;
+      }
+      fetch(url).then(res => res.json()).then(setProducts).catch(console.error);
+    };
+
+    fetchProducts();
+    const interval = setInterval(fetchProducts, 60000); // Poll every 1 minute
+    return () => clearInterval(interval);
   }, [selectedCategory]);
 
   useEffect(() => { loadCart(); }, []);

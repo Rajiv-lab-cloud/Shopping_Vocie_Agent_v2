@@ -73,8 +73,10 @@ Customer Audio (WAV/WebM/MP3)
 - **Multi-Model Fail-Safe Design**: By separating concerns into highly specialized models (STT, LLM, Embedding, TTS), the pipeline ensures rapid execution and fail-safe redundancy. If semantic search yields no results, the RAG engine automatically falls back to raw SQL price-constraint filtering.
 - **PostgreSQL Vector Database**: Replaced legacy SQLite and FAISS files with an enterprise-grade `pgvector` integration. This enables executing advanced cosine similarity (`<=>`) semantic searches intertwined with standard SQL WHERE clauses (like price caps) in a single, lightning-fast database transaction.
 - **Dockerized Infrastructure**: A seamless `docker-compose.yml` spins up a robust PostgreSQL 16 instance pre-configured with the `pgvector` extension, guaranteeing a reproducible environment anywhere.
-- **Comprehensive Guardrails**: Fully integrated input and output validations. The system actively hunts for prompt injections, redacts PII (emails/phone numbers), clamps out-of-bounds queries, and scrubs hallucinated products before they reach the frontend.
+- **Comprehensive Guardrails**: Fully integrated input and output validations. The system actively hunts for prompt injections, redacts PII (emails/phone numbers), clamps out-of-bounds queries, and scrub hallucinated products before they reach the frontend.
 - **Real-Time UI Orchestration**: The AI dynamically generates structured JSON `ui_actions` (like `FILTER_PRODUCTS` or `ADD_TO_CART`) which command the frontend UI state without requiring page reloads.
+- **Smart Real-Time Inventory Tracking**: The system accurately tracks product stock, prevents users from ordering out-of-stock items, handles checkout stock deductions on the backend, and automatically syncs the frontend UI in near real-time via background polling.
+- **Dynamic Synthetic Categories**: Includes an automated LLM-powered data generation pipeline (`scripts/generate_synthetic_data.py`) to easily scale up the catalog with highly diverse, realistic e-commerce products across multiple categories.
 
 ---
 
@@ -208,10 +210,16 @@ pytest tests/ -v
 
 ---
 
-## Adding Products
+## Adding Products & Expanding Catalog
 
-1. Add product entries to `db/seed.py`.
-2. Re-run the seeder to recalculate embeddings and insert them into PostgreSQL:
+There are two ways to add products to your store:
+1. **Manual Entry**: Add new product entries directly to `products.json`.
+2. **AI Synthetic Generation**: Automatically expand your catalog with diverse new categories using the built-in LLM script:
+   ```bash
+   python scripts/generate_synthetic_data.py
+   ```
+
+After using either method, re-run the seeder to recalculate embeddings and insert them into PostgreSQL:
    ```bash
    python -m db.seed
    ```

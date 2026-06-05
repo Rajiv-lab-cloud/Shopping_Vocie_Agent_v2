@@ -61,7 +61,7 @@ def get_all_products(limit: int = 10000, offset: int = 0) -> list[dict]:
                 SELECT *,
                        ROW_NUMBER() OVER(PARTITION BY category_id ORDER BY RANDOM()) as rn
                 FROM products
-                WHERE is_active = 1
+                WHERE is_active = 1 AND stock > 0
             ) p
             JOIN categories c ON p.category_id = c.id
             WHERE p.rn <= 1000
@@ -84,7 +84,7 @@ def get_products_by_ids(ids: list[int]) -> list[dict]:
             SELECT p.*, c.name AS category_name, c.slug AS category_slug
             FROM products p
             JOIN categories c ON p.category_id = c.id
-            WHERE p.id IN ({placeholders}) AND p.is_active = 1
+            WHERE p.id IN ({placeholders}) AND p.is_active = 1 AND p.stock > 0
             """,
             ids,
         ).fetchall()
@@ -99,7 +99,7 @@ def get_products_by_category(category_name: str, limit: int = 50) -> list[dict]:
             SELECT p.*, c.name AS category_name, c.slug AS category_slug
             FROM products p
             JOIN categories c ON p.category_id = c.id
-            WHERE (c.name = %s OR p.tags LIKE %s) AND p.is_active = 1
+            WHERE (c.name = %s OR p.tags LIKE %s) AND p.is_active = 1 AND p.stock > 0
             LIMIT %s
             """,
             (category_name, f'%%"{category_name}"%%', limit),
@@ -111,7 +111,7 @@ def product_exists(product_id: int) -> bool:
     """Check whether a product ID exists and is active."""
     with get_db() as conn:
         row = conn.execute(
-            "SELECT 1 FROM products WHERE id = %s AND is_active = 1", (product_id,)
+            "SELECT 1 FROM products WHERE id = %s AND is_active = 1 AND stock > 0", (product_id,)
         ).fetchone()
     return row is not None
 
@@ -184,6 +184,23 @@ def remove_from_cart(cart_id: int) -> bool:
 def clear_cart() -> None:
     """Empty the cart."""
     with get_db() as conn:
+        conn.execute("DELETE FROM cart")
+
+
+def checkout_cart() -> None:
+    """Empty the cart and decrement the stock of products."""
+    with get_db() as conn:
+        rows = conn.execute("SELECT product_id, quantity FROM cart").fetchall()
+        for row in rows:
+            conn.execute(
+                """
+                UPDATE products 
+                SET stock = GREATEST(stock - %s, 0),
+                    is_active = CASE WHEN (stock - %s) <= 0 THEN 0 ELSE is_active END
+                WHERE id = %s
+                """,
+                (row["quantity"], row["quantity"], row["product_id"])
+            )
         conn.execute("DELETE FROM cart")
 
 
