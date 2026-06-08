@@ -7,7 +7,7 @@ import io
 import logging
 from pathlib import Path
 
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 
 import config
 
@@ -53,24 +53,14 @@ def _call_stt(audio_file: tuple, language: str) -> str:
             request["language"] = language
 
         response = client.audio.transcriptions.create(**request)
-        return str(response.text).strip()
+        if isinstance(response, str):
+            return response.strip()
+        return str(getattr(response, "text", response)).strip()
     except Exception as exc:
-        from openai import RateLimitError
-
         if isinstance(exc, RateLimitError) or (
             hasattr(exc, "status_code") and exc.status_code == 429
         ):
-            fallbacks = ["whisper-1"]
-            if config.STT_MODEL in fallbacks:
-                idx = fallbacks.index(config.STT_MODEL)
-                if idx + 1 < len(fallbacks):
-                    new_model = fallbacks[idx + 1]
-                    logger.warning(
-                        "STT rate limit reached for %s. Auto-switching to %s",
-                        config.STT_MODEL,
-                        new_model,
-                    )
-                    config.STT_MODEL = new_model
+            logger.warning("OpenAI STT rate limit reached for %s", config.STT_MODEL)
         raise exc
 
 
@@ -88,7 +78,7 @@ def transcribe(audio_bytes: bytes, filename: str = "audio.wav") -> str:
     Raises:
         RuntimeError: On API failure.
     """
-    # Wrap bytes in a file-like object — OpenAI SDK expects a tuple or file path
+    # Wrap bytes in a file-like object; the SDK accepts a tuple with filename and MIME type.
     audio_file = (filename, io.BytesIO(audio_bytes), _mime_type(filename))
 
     try:

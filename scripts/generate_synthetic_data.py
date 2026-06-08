@@ -16,7 +16,7 @@ from openai import OpenAI
 # Load .env
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-API_KEY = os.getenv("OPENAI_API_KEY") or os.getenv("GROQ_API_KEY")
+API_KEY = os.getenv("OPENAI_API_KEY")
 if not API_KEY:
     print("Error: OPENAI_API_KEY not set.")
     sys.exit(1)

@@ -14,7 +14,7 @@ Customer Audio (WAV/WebM/MP3)
         │
         ▼
 ┌─────────────────────┐
-│  1. Whisper STT     │  OpenAI: whisper-1
+│  1. Whisper STT     │  openai: whisper-1
 └──────────┬──────────┘
            │ transcript
            ▼
@@ -30,7 +30,7 @@ Customer Audio (WAV/WebM/MP3)
            │ product_context
            ▼
 ┌─────────────────────┐
-│  4. LLM Agent       │  OpenAI: gpt-4o-mini (JSON mode)
+│  4. LLM Agent       │  openai: gpt-4o-mini (JSON mode)
 │  System Prompt +    │  → {response_text, intent, ui_actions}
 │  Few-shot examples  │
 └──────────┬──────────┘
@@ -42,7 +42,7 @@ Customer Audio (WAV/WebM/MP3)
            │ validated_output
            ▼
 ┌─────────────────────┐
-│  6. Orpheus TTS     │  OpenAI: tts-1
+│  6. OpenAI TTS      │  openai: tts-1
 └──────────┬──────────┘
            │ audio_bytes
            ▼
@@ -57,9 +57,9 @@ Customer Audio (WAV/WebM/MP3)
 
 | Layer       | Technology                              | Description                               |
 |-------------|------------------------------------------|-------------------------------------------|
-| **STT**     | `whisper-1` via OpenAI        | Ultra-fast speech-to-text                 |
-| **LLM**     | `gpt-4o-mini` via OpenAI       | Reasoning, entity extraction, and JSON    |
-| **TTS**     | `tts-1` via OpenAI              | Low-latency voice synthesis               |
+| **STT**     | `whisper-1` via OpenAI                   | Speech-to-text                            |
+| **LLM**     | `gpt-4o-mini` via OpenAI                 | Reasoning, entity extraction, and JSON    |
+| **TTS**     | `tts-1` via OpenAI                       | Voice synthesis                           |
 | **Embeddings** | `all-MiniLM-L6-v2` (384-dim)         | Semantic vector generation                |
 | **Vector DB** | PostgreSQL + `pgvector`                | Advanced hybrid search (semantic + SQL)   |
 | **Platform**| Docker & Docker Compose                  | Containerized database and environment    |
@@ -120,7 +120,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 DATABASE_URL=postgresql://shopbot:shopbot_password@localhost:5433/shopping_db
 ```
 
-Get a free OpenAI API key at: https://platform.openai.com/api-keys
+Get an OpenAI API key at: https://platform.openai.com
 
 ### 3. Boot Up the PostgreSQL Database
 
@@ -230,11 +230,11 @@ After using either method, re-run the seeder to recalculate embeddings and inser
 
 | Variable         | Default                              | Description                   |
 |------------------|--------------------------------------|-------------------------------|
-| `OPENAI_API_KEY` | *(required)*                         | OpenAI API key                 |
+| `OPENAI_API_KEY` | *(required)*                         | OpenAI API key                |
 | `DATABASE_URL`   | *(required)*                         | PostgreSQL connection URL     |
-| `STT_MODEL`      | `whisper-1`                          | OpenAI Whisper model           |
-| `LLM_MODEL`      | `gpt-4o-mini`                        | OpenAI LLM model               |
-| `TTS_MODEL`      | `tts-1`                              | OpenAI TTS model               |
+| `STT_MODEL`      | `whisper-1`                          | OpenAI Whisper model          |
+| `LLM_MODEL`      | `gpt-4o-mini`                        | OpenAI chat model             |
+| `TTS_MODEL`      | `tts-1`                              | OpenAI TTS model              |
 | `EMBEDDING_MODEL`| `sentence-transformers/all-MiniLM-L6-v2` | Embedding model           |
 | `PORT`           | `8000`                               | API server port               |
 
@@ -242,12 +242,12 @@ After using either method, re-run the seeder to recalculate embeddings and inser
 
 ## OpenAI Models Used
 
-All three AI models are served by [OpenAI](https://platform.openai.com):
+All three AI models are served by OpenAI:
 
 | Model                           | Use          | Speed      |
 |---------------------------------|--------------|------------|
-| `whisper-1`                    | STT          | ~0.3-1.0s  |
-| `gpt-4o-mini`                  | LLM Reasoning| ~0.8-2.5s  |
-| `tts-1`                        | TTS          | ~0.3-1.0s  |
+| `whisper-1`                     | STT          | API call   |
+| `gpt-4o-mini`                   | LLM Reasoning| API call   |
+| `tts-1`                         | TTS          | API call   |
 
 Total pipeline latency: typically **2–4 seconds** end-to-end.

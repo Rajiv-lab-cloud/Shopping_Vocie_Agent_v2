@@ -154,7 +154,7 @@ async def shop(
     - `transcript` — what the customer said
     - `response_text` — what ShopBot says back
     - `ui_actions` — list of website control commands for the frontend
-    - `audio_b64` — base64-encoded WAV of the spoken response
+    - `audio_b64` — base64-encoded MP3 of the spoken response
     """
     if audio is None and (text is None or text.strip() == ""):
         raise HTTPException(

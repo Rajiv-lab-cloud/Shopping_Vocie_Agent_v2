@@ -1,5 +1,5 @@
 """
-LLM client using OpenAI chat completions.
+LLM client using OpenAI Chat Completions.
 Sends the assembled prompt and returns a parsed structured response.
 Supports multi-turn conversation history.
 """
@@ -9,7 +9,7 @@ import logging
 import re
 from typing import Any
 
-from openai import OpenAI
+from openai import APIStatusError, OpenAI, RateLimitError
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -54,7 +54,7 @@ DEFAULT_RESPONSE: dict[str, Any] = {
     reraise=True,
 )
 def _call_llm(system_prompt: str, messages: list[dict]) -> str:
-    """Call OpenAI chat completion with full conversation history and return raw response."""
+    """Call OpenAI LLM with full conversation history and return raw response string."""
     client = _get_client()
 
     try:
@@ -70,30 +70,10 @@ def _call_llm(system_prompt: str, messages: list[dict]) -> str:
         )
         return completion.choices[0].message.content or ""
     except Exception as exc:
-        from openai import RateLimitError
-        from openai import APIStatusError
-
-        is_rate_limit = (
-            isinstance(exc, RateLimitError)
-            or isinstance(exc, APIStatusError)
-            and getattr(exc, "status_code", None) == 429
-        )
-        if is_rate_limit:
-            fallbacks = [
-                "gpt-4o-mini",
-                "gpt-4o",
-                "gpt-3.5-turbo",
-            ]
-            if config.LLM_MODEL in fallbacks:
-                idx = fallbacks.index(config.LLM_MODEL)
-                if idx + 1 < len(fallbacks):
-                    new_model = fallbacks[idx + 1]
-                    logger.warning(
-                        "LLM rate limit reached for %s. Auto-switching to %s",
-                        config.LLM_MODEL,
-                        new_model,
-                    )
-                    config.LLM_MODEL = new_model
+        if isinstance(exc, RateLimitError) or (
+            isinstance(exc, APIStatusError) and exc.status_code == 429
+        ):
+            logger.warning("OpenAI LLM rate limit reached for %s", config.LLM_MODEL)
         raise exc
 
 

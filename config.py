@@ -12,9 +12,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
 # OpenAI
-OPENAI_API_KEY: str = os.getenv(
-    "OPENAI_API_KEY", os.getenv("GROQ_API_KEY", "")
-)  # GROQ_API_KEY kept for transition compatibility
+OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 
 # Models
 STT_MODEL: str = os.getenv("STT_MODEL", "whisper-1")

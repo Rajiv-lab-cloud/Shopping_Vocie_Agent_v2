@@ -6,7 +6,7 @@ Returns MP3 audio bytes that can be base64-encoded and sent to the frontend.
 import base64
 import logging
 
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 
 import config
 
@@ -39,16 +39,6 @@ from tenacity import (
     reraise=True,
 )
 def _call_tts(text: str) -> bytes:
-    if config.TTS_MODEL == "gTTS":
-        import io
-
-        from gtts import gTTS
-
-        tts = gTTS(text=text, lang="en")
-        fp = io.BytesIO()
-        tts.write_to_fp(fp)
-        return fp.getvalue()
-
     client = _get_client()
     try:
         response = client.audio.speech.create(
@@ -59,22 +49,10 @@ def _call_tts(text: str) -> bytes:
         )
         return response.read()
     except Exception as exc:
-        from openai import RateLimitError
-
         if isinstance(exc, RateLimitError) or (
             hasattr(exc, "status_code") and exc.status_code == 429
         ):
-        fallbacks = ["tts-1", "tts-1-hd", "gTTS"]
-            if config.TTS_MODEL in fallbacks:
-                idx = fallbacks.index(config.TTS_MODEL)
-                if idx + 1 < len(fallbacks):
-                    new_model = fallbacks[idx + 1]
-            logger.warning(
-                "TTS rate limit reached for %s. Auto-switching to %s",
-                config.TTS_MODEL,
-                new_model,
-            )
-            config.TTS_MODEL = new_model
+            logger.warning("OpenAI TTS rate limit reached for %s", config.TTS_MODEL)
         raise exc
 
 
@@ -100,7 +78,7 @@ def synthesize(text: str) -> bytes:
 
 def synthesize_b64(text: str) -> str:
     """
-    Convert text to speech and return base64-encoded WAV string.
+    Convert text to speech and return base64-encoded MP3 string.
     Convenient for embedding directly in JSON API responses.
     """
     audio_bytes = synthesize(text)

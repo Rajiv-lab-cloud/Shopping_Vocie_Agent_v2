@@ -6,9 +6,9 @@ Pipeline:
     → STT (Whisper via OpenAI)
     → Input Guardrails
     → RAG Retrieval (FAISS + SQLite)
-    → LLM Agent (OpenAI)
+    → LLM Agent (OpenAI gpt-4o-mini)
     → Output Guardrails
-    → TTS (OpenAI tts-1)
+    → TTS (OpenAI TTS)
     → structured response dict
 """
 
@@ -68,7 +68,7 @@ def run(
             intent        (str)  — detected intent
             confidence    (float)
             ui_actions    (list) — website control commands
-            audio_b64     (str)  — base64-encoded WAV (empty if skip_tts=True)
+            audio_b64     (str)  — base64-encoded MP3 (empty if skip_tts=True)
             latency_ms    (dict) — per-stage timing for observability
     """
     timings: dict[str, float] = {}
