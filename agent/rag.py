@@ -20,6 +20,39 @@ logger = logging.getLogger(__name__)
 _lock = threading.Lock()
 _embedder = None
 
+_CONCEPT_KEYWORDS = {
+    "healthy": [
+        "apple",
+        "fruit",
+        "fruits",
+        "fresh",
+        "organic",
+        "vegetable",
+        "vegetables",
+        "groceries",
+    ],
+    "health": [
+        "apple",
+        "fruit",
+        "fruits",
+        "fresh",
+        "organic",
+        "vegetable",
+        "vegetables",
+        "groceries",
+    ],
+    "nutritious": [
+        "apple",
+        "fruit",
+        "fruits",
+        "fresh",
+        "organic",
+        "vegetable",
+        "vegetables",
+        "groceries",
+    ],
+}
+
 
 # Embedder
 
@@ -208,6 +241,9 @@ def retrieve(
         for p in filtered_products:
             p["_semantic_score"] = 0.0
 
+    if not filtered_products:
+        filtered_products = _concept_fallback_from_db(query, price_constraints, n)
+
     # Sort by semantic score descending (in case fallback was used, or just to be safe)
     filtered_products.sort(key=lambda p: p["_semantic_score"], reverse=True)
 
@@ -261,6 +297,80 @@ def _price_fallback_from_db(constraints: dict, limit: int) -> list[dict]:
     results = [dict(row) for row in rows]
     logger.info("RAG | DB price fallback returned %d products", len(results))
     return results
+
+
+def _concept_fallback_from_db(
+    query: str, constraints: Optional[dict], limit: int
+) -> list[dict]:
+    """Map broad shopping intent words to concrete catalog terms."""
+    keywords = _concept_keywords_for_query(query)
+    if not keywords:
+        return []
+
+    max_price = constraints.get("max_price") if constraints else None
+    min_price = constraints.get("min_price") if constraints else None
+
+    conditions = ["p.is_active = 1"]
+    params = []
+
+    if max_price is not None:
+        conditions.append("p.price <= %s")
+        params.append(max_price)
+    if min_price is not None:
+        conditions.append("p.price >= %s")
+        params.append(min_price)
+
+    keyword_clauses = []
+    for keyword in keywords:
+        pattern = f"%{keyword}%"
+        keyword_clauses.append(
+            """
+            (
+                p.name ILIKE %s OR
+                p.description ILIKE %s OR
+                COALESCE(p.tags, '') ILIKE %s OR
+                c.name ILIKE %s OR
+                c.slug ILIKE %s
+            )
+            """
+        )
+        params.extend([pattern, pattern, pattern, pattern, pattern])
+
+    conditions.append("(" + " OR ".join(keyword_clauses) + ")")
+    params.append(limit)
+
+    with get_db() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT p.*, c.name AS category_name, c.slug AS category_slug
+            FROM products p
+            JOIN categories c ON p.category_id = c.id
+            WHERE {" AND ".join(conditions)}
+            ORDER BY p.rating DESC, p.review_count DESC
+            LIMIT %s
+            """,
+            params,
+        ).fetchall()
+
+    results = [dict(row) for row in rows]
+    for product in results:
+        product["_semantic_score"] = 0.0
+
+    logger.info(
+        "RAG | Concept fallback keywords=%s returned %d products",
+        keywords,
+        len(results),
+    )
+    return results
+
+
+def _concept_keywords_for_query(query: str) -> list[str]:
+    query_terms = set(re.findall(r"[a-zA-Z][a-zA-Z0-9]*", query.lower()))
+    keywords = []
+    for trigger, mapped_keywords in _CONCEPT_KEYWORDS.items():
+        if trigger in query_terms:
+            keywords.extend(mapped_keywords)
+    return list(dict.fromkeys(keywords))
 
 
 def preload() -> None:

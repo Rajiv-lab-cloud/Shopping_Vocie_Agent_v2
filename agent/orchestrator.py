@@ -14,6 +14,7 @@ Pipeline:
 
 import json
 import logging
+import re
 import time
 from typing import Any, Generator, Optional
 
@@ -148,6 +149,10 @@ def run(
         price_constraints=price_constraints,
         cart_context=cart_context,
         profile_context=profile_context,
+    )
+
+    llm_response = _enforce_inventory_grounding(
+        safe_transcript, retrieved_products, llm_response
     )
 
     if not retrieved_products and llm_response.get("intent") == "product_search":
@@ -328,6 +333,10 @@ def run_stream(
         profile_context=profile_context,
     )
 
+    llm_response = _enforce_inventory_grounding(
+        safe_transcript, retrieved_products, llm_response
+    )
+
     # If the LLM tried to search for products but we found none, it shouldn't filter the UI
     # This prevents the 8B model from randomly filtering to "Groceries" when asked for "Snacks" (which we don't have)
     if not retrieved_products and llm_response.get("intent") == "product_search":
@@ -454,3 +463,247 @@ def _guardrail_response(
         "audio_b64": audio_b64,
         "latency_ms": timings,
     }
+
+
+_PRODUCT_INTENTS = {"product_search", "product_detail", "add_to_cart", "mood_based"}
+_PRODUCT_ACTIONS = {
+    "SHOW_PRODUCTS",
+    "SHOW_PRODUCT_DETAIL",
+    "ADD_TO_CART",
+    "UPDATE_CART_QUANTITY",
+}
+_QUERY_STOPWORDS = {
+    "a",
+    "about",
+    "add",
+    "an",
+    "and",
+    "anything",
+    "any",
+    "are",
+    "below",
+    "best",
+    "buy",
+    "can",
+    "cart",
+    "cheap",
+    "cheaper",
+    "could",
+    "find",
+    "for",
+    "get",
+    "give",
+    "good",
+    "great",
+    "have",
+    "help",
+    "i",
+    "ill",
+    "in",
+    "into",
+    "is",
+    "it",
+    "like",
+    "looking",
+    "me",
+    "my",
+    "need",
+    "not",
+    "nice",
+    "of",
+    "ok",
+    "okay",
+    "please",
+    "rs",
+    "rupees",
+    "show",
+    "some",
+    "something",
+    "take",
+    "that",
+    "the",
+    "these",
+    "this",
+    "to",
+    "under",
+    "want",
+    "will",
+    "with",
+    "would",
+    "you",
+}
+_DESCRIPTOR_TERMS = {
+    "affordable",
+    "beautiful",
+    "best",
+    "better",
+    "cool",
+    "cute",
+    "delicious",
+    "expensive",
+    "fresh",
+    "healthy",
+    "nice",
+    "popular",
+    "premium",
+    "relaxing",
+    "stylish",
+    "sweet",
+    "tasty",
+}
+_CORRECTION_WORDS = {
+    "actually",
+    "available",
+    "carry",
+    "catalog",
+    "did",
+    "didnt",
+    "does",
+    "doesnt",
+    "don",
+    "dont",
+    "got",
+    "have",
+    "inventory",
+    "right",
+    "said",
+    "saying",
+    "thought",
+}
+
+
+def _enforce_inventory_grounding(
+    query: str, products: list[dict], response: dict[str, Any]
+) -> dict[str, Any]:
+    """Block product answers when the explicit requested item is not in inventory text."""
+    if not _needs_product_grounding(response):
+        return response
+
+    requested_terms = _requested_product_terms(query)
+    if not requested_terms:
+        return response
+
+    inventory_terms = _inventory_terms(products)
+    missing_terms = [term for term in requested_terms if term not in inventory_terms]
+    if not missing_terms:
+        return response
+
+    item_label = _requested_item_label(requested_terms)
+    logger.warning(
+        "PIPELINE | Grounding blocked unavailable request=%r missing_terms=%s",
+        query[:120],
+        missing_terms,
+    )
+    return {
+        "response_text": (
+            f"I'm sorry, we don't have {item_label} in our catalog right now. "
+            "I can only show items that are available in our inventory."
+        ),
+        "intent": "out_of_stock",
+        "confidence": 1.0,
+        "ui_actions": [],
+    }
+
+
+def _needs_product_grounding(response: dict[str, Any]) -> bool:
+    intent = str(response.get("intent", "")).lower()
+    if intent in _PRODUCT_INTENTS:
+        return True
+
+    for action in response.get("ui_actions", []):
+        if not isinstance(action, dict):
+            continue
+        if str(action.get("action", "")).upper() in _PRODUCT_ACTIONS:
+            return True
+    return False
+
+
+def _requested_product_terms(query: str) -> list[str]:
+    raw_tokens = [
+        _normalize_term(token)
+        for token in re.findall(r"[a-zA-Z][a-zA-Z0-9]*", query.lower())
+    ]
+    tokens = [
+        token
+        for token in raw_tokens
+        if token and len(token) >= 3 and token not in _QUERY_STOPWORDS
+    ]
+
+    quoted_terms = re.findall(r'"([^"]+)"|\'([^\']+)\'', query.lower())
+    quoted_tokens = []
+    for match in quoted_terms:
+        quoted_text = next((part for part in match if part), "")
+        quoted_tokens.extend(
+            _normalize_term(token)
+            for token in re.findall(r"[a-zA-Z][a-zA-Z0-9]*", quoted_text)
+        )
+
+    after_intent = re.search(
+        r"\b(?:show|find|buy|get|take|want|need|looking for|search for)\b\s+(?:me\s+)?(?:some\s+|a\s+|an\s+|the\s+)?(.+)",
+        query.lower(),
+    )
+    intent_tokens = []
+    if after_intent:
+        intent_text = re.split(r"[.?!,;]", after_intent.group(1), maxsplit=1)[0]
+        intent_tokens = [
+            _normalize_term(token)
+            for token in re.findall(r"[a-zA-Z][a-zA-Z0-9]*", intent_text)
+        ]
+
+    terms = [
+        token
+        for token in [*quoted_tokens, *intent_tokens, *tokens]
+        if (
+            token
+            and len(token) >= 3
+            and token not in _QUERY_STOPWORDS
+            and token not in _DESCRIPTOR_TERMS
+            and token not in _CORRECTION_WORDS
+        )
+    ]
+    unique_terms = list(dict.fromkeys(terms))
+    if not quoted_tokens and not intent_tokens and len(unique_terms) > 2:
+        return []
+    return unique_terms
+
+
+def _inventory_terms(products: list[dict]) -> set[str]:
+    text_parts = []
+    for product in products:
+        text_parts.extend(
+            str(product.get(field, ""))
+            for field in (
+                "name",
+                "brand",
+                "category_name",
+                "category_slug",
+                "description",
+                "color",
+                "tags",
+            )
+        )
+
+    terms = set()
+    for token in re.findall(r"[a-zA-Z][a-zA-Z0-9]*", " ".join(text_parts).lower()):
+        normalized = _normalize_term(token)
+        if normalized:
+            terms.add(normalized)
+    return terms
+
+
+def _normalize_term(term: str) -> str:
+    if len(term) > 3 and term.endswith("ies"):
+        return term[:-3] + "y"
+    if len(term) > 3 and term.endswith("es"):
+        return term[:-2]
+    if len(term) > 3 and term.endswith("s"):
+        return term[:-1]
+    return term
+
+
+def _requested_item_label(terms: list[str]) -> str:
+    if not terms:
+        return "that item"
+    if len(terms) == 1:
+        return terms[0]
+    return " ".join(terms[:3])
