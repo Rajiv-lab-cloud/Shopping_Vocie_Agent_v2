@@ -15,10 +15,10 @@ load_dotenv(Path(__file__).parent / ".env")
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 
 # Models
-STT_MODEL: str = os.getenv("STT_MODEL", "whisper-1")
+STT_MODEL: str = os.getenv("STT_MODEL", "gpt-4o-mini-transcribe")
 STT_LANGUAGE: str = os.getenv("STT_LANGUAGE", "").strip()
-LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
-TTS_MODEL: str = os.getenv("TTS_MODEL", "tts-1")
+LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4.1")
+TTS_MODEL: str = os.getenv("TTS_MODEL", "gpt-4o-mini-tts")
 TTS_VOICE: str = os.getenv("TTS_VOICE", "alloy")
 
 # RAG
