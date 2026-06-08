@@ -1,5 +1,5 @@
 """
-LLM client using Groq's OpenAI-compatible API.
+LLM client using OpenAI chat completions.
 Sends the assembled prompt and returns a parsed structured response.
 Supports multi-turn conversation history.
 """
@@ -9,7 +9,7 @@ import logging
 import re
 from typing import Any
 
-from groq import Groq
+from openai import OpenAI
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -22,15 +22,15 @@ from agent.prompt import build_system_prompt, format_products_for_prompt
 
 logger = logging.getLogger(__name__)
 
-_client: Groq | None = None
+_client: OpenAI | None = None
 
 
-def _get_client() -> Groq:
+def _get_client() -> OpenAI:
     global _client
     if _client is None:
-        if not config.GROQ_API_KEY:
-            raise RuntimeError("GROQ_API_KEY is not set.")
-        _client = Groq(api_key=config.GROQ_API_KEY)
+        if not config.OPENAI_API_KEY:
+            raise RuntimeError("OPENAI_API_KEY is not set.")
+        _client = OpenAI(api_key=config.OPENAI_API_KEY)
     return _client
 
 
@@ -54,7 +54,7 @@ DEFAULT_RESPONSE: dict[str, Any] = {
     reraise=True,
 )
 def _call_llm(system_prompt: str, messages: list[dict]) -> str:
-    """Call Groq LLM with full conversation history and return raw response string."""
+    """Call OpenAI chat completion with full conversation history and return raw response."""
     client = _get_client()
 
     try:
@@ -70,16 +70,19 @@ def _call_llm(system_prompt: str, messages: list[dict]) -> str:
         )
         return completion.choices[0].message.content or ""
     except Exception as exc:
-        import groq
+        from openai import RateLimitError
+        from openai import APIStatusError
 
-        if isinstance(exc, groq.RateLimitError) or (
-            hasattr(exc, "status_code") and exc.status_code == 429
-        ):
+        is_rate_limit = (
+            isinstance(exc, RateLimitError)
+            or isinstance(exc, APIStatusError)
+            and getattr(exc, "status_code", None) == 429
+        )
+        if is_rate_limit:
             fallbacks = [
-                "llama-3.3-70b-versatile",
-                "llama-3.1-8b-instant",
-                "mixtral-8x7b-32768",
-                "gemma2-9b-it",
+                "gpt-4o-mini",
+                "gpt-4o",
+                "gpt-3.5-turbo",
             ]
             if config.LLM_MODEL in fallbacks:
                 idx = fallbacks.index(config.LLM_MODEL)

@@ -84,7 +84,7 @@ class ShopResponse(BaseModel):
     intent: str = Field(..., description="Detected customer intent")
     confidence: float = Field(..., ge=0.0, le=1.0)
     ui_actions: list[UIAction] = Field(default_factory=list)
-    audio_b64: str = Field("", description="Base64-encoded WAV audio")
+    audio_b64: str = Field("", description="Base64-encoded MP3 audio")
     latency_ms: dict[str, float] = Field(default_factory=dict)
 
 

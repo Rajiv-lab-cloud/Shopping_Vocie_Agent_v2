@@ -4,7 +4,7 @@ run.py — One-click startup for the Voice Shopping Agent.
 What this does automatically:
   1. Checks Python version
   2. Installs missing dependencies from requirements.txt
-  3. Validates .env / GROQ_API_KEY
+  3. Validates .env / OPENAI_API_KEY
   4. Initialises the Postgres database + seeds 50 products
   5. Starts the FastAPI server via uvicorn
   6. Opens the demo in your browser
@@ -65,7 +65,7 @@ def dim(t):
 BANNER = f"""
 {cyan("+--------------------------------------------------+")}
 {cyan("|")}   {bold("ShopBot  --  Voice AI Shopping Assistant")}      {cyan("|")}
-{cyan("|")}   {dim("Powered by Groq  |  PostgreSQL  |  FastAPI")}      {cyan("|")}
+{cyan("|")}   {dim("Powered by OpenAI  |  PostgreSQL  |  FastAPI")}      {cyan("|")}
 {cyan("+--------------------------------------------------+")}
 """
 
@@ -118,7 +118,7 @@ def install_dependencies():
         fail("requirements.txt not found.")
 
     try:
-        import fastapi, groq, psycopg, sentence_transformers, pgvector  # noqa
+        import fastapi, openai, psycopg, sentence_transformers, pgvector  # noqa
 
         ok("All core dependencies already installed.")
         return
@@ -162,7 +162,7 @@ def check_env():
         if env_example.exists():
             shutil.copy(env_example, env_file)
             warn(".env not found — created from .env.example")
-            warn(f"  → Open {env_file} and set GROQ_API_KEY before continuing.")
+            warn(f"  → Open {env_file} and set OPENAI_API_KEY before continuing.")
         else:
             fail(".env file not found and no .env.example to copy from.")
 
@@ -171,21 +171,21 @@ def check_env():
 
     load_dotenv(env_file)
 
-    key = os.getenv("GROQ_API_KEY", "").strip()
-    if not key or key == "your_groq_api_key_here":
+    key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not key or key == "your_openai_api_key_here":
         print()
         print(red("  ╔════════════════════════════════════════════════╗"))
-        print(red("  ║  GROQ_API_KEY is missing or not set!           ║"))
+        print(red("  ║  OPENAI_API_KEY is missing or not set!           ║"))
         print(red("  ║                                                ║"))
-        print(red("  ║  1. Get a free key at https://console.groq.com ║"))
+        print(red("  ║  1. Get a key at https://platform.openai.com ║"))
         print(red("  ║  2. Open .env and set:                         ║"))
-        print(red("  ║     GROQ_API_KEY=gsk_your_key_here             ║"))
+        print(red("  ║     OPENAI_API_KEY=your_openai_api_key_here             ║"))
         print(red("  ║  3. Re-run:  python run.py                     ║"))
         print(red("  ╚════════════════════════════════════════════════╝"))
         print()
         sys.exit(1)
 
-    ok(f"GROQ_API_KEY configured (…{key[-6:]})")
+    ok(f"OPENAI_API_KEY configured (…{key[-6:]})")
 
 
 def init_database():

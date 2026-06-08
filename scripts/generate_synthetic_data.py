@@ -1,6 +1,6 @@
 """
 generate_synthetic_data.py
-Connects to Groq LLaMA to generate diverse synthetic e-commerce products.
+Connects to OpenAI to generate diverse synthetic e-commerce products.
 """
 import os
 import json
@@ -11,17 +11,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
-from groq import Groq
+from openai import OpenAI
 
 # Load .env
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-API_KEY = os.getenv("GROQ_API_KEY")
+API_KEY = os.getenv("OPENAI_API_KEY") or os.getenv("GROQ_API_KEY")
 if not API_KEY:
-    print("Error: GROQ_API_KEY not set.")
+    print("Error: OPENAI_API_KEY not set.")
     sys.exit(1)
 
-client = Groq(api_key=API_KEY)
+client = OpenAI(api_key=API_KEY)
 
 # Categories we want to add
 CATEGORIES = ["automotive", "electronics", "home-appliances", "toys", "sports", "books", "gaming"]
@@ -49,9 +49,9 @@ Generate realistic product titles, descriptions, and brands. Make sure the outpu
 """
 
 def generate_data():
-    print("Requesting synthetic data from Groq LLaMA 3.3 70B...")
+    print("Requesting synthetic data from OpenAI...")
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="gpt-4o-mini",
         messages=[{"role": "system", "content": prompt}],
         response_format={"type": "json_object"},
         temperature=0.7,

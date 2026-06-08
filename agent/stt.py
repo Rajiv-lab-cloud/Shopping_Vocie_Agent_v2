@@ -1,5 +1,5 @@
 """
-Speech-to-Text module using Groq's Whisper API.
+Speech-to-Text module using OpenAI's Whisper API.
 Accepts raw audio bytes in any format and returns a transcript string.
 """
 
@@ -7,22 +7,22 @@ import io
 import logging
 from pathlib import Path
 
-from groq import Groq
+from openai import OpenAI
 
 import config
 
 logger = logging.getLogger(__name__)
 
 # Lazy-loaded client (created once per process)
-_client: Groq | None = None
+_client: OpenAI | None = None
 
 
-def _get_client() -> Groq:
+def _get_client() -> OpenAI:
     global _client
     if _client is None:
-        if not config.GROQ_API_KEY:
-            raise RuntimeError("GROQ_API_KEY is not set. Add it to your .env file.")
-        _client = Groq(api_key=config.GROQ_API_KEY)
+        if not config.OPENAI_API_KEY:
+            raise RuntimeError("OPENAI_API_KEY is not set. Add it to your .env file.")
+        _client = OpenAI(api_key=config.OPENAI_API_KEY)
     return _client
 
 
@@ -53,18 +53,14 @@ def _call_stt(audio_file: tuple, language: str) -> str:
             request["language"] = language
 
         response = client.audio.transcriptions.create(**request)
-        return str(response).strip()
+        return str(response.text).strip()
     except Exception as exc:
-        import groq
+        from openai import RateLimitError
 
-        if isinstance(exc, groq.RateLimitError) or (
+        if isinstance(exc, RateLimitError) or (
             hasattr(exc, "status_code") and exc.status_code == 429
         ):
-            fallbacks = [
-                "whisper-large-v3-turbo",
-                "whisper-large-v3",
-                "distil-whisper-large-v3-en",
-            ]
+            fallbacks = ["whisper-1"]
             if config.STT_MODEL in fallbacks:
                 idx = fallbacks.index(config.STT_MODEL)
                 if idx + 1 < len(fallbacks):
@@ -80,11 +76,11 @@ def _call_stt(audio_file: tuple, language: str) -> str:
 
 def transcribe(audio_bytes: bytes, filename: str = "audio.wav") -> str:
     """
-    Transcribe audio bytes to text using Groq Whisper.
+    Transcribe audio bytes to text using OpenAI Whisper.
 
     Args:
         audio_bytes: Raw audio data (WAV, MP3, WebM, OGG, M4A, FLAC).
-        filename:    Hint for the file extension so Groq picks the right decoder.
+        filename:    Hint for the file extension so OpenAI picks the right decoder.
 
     Returns:
         Transcript string (stripped of leading/trailing whitespace).
@@ -92,7 +88,7 @@ def transcribe(audio_bytes: bytes, filename: str = "audio.wav") -> str:
     Raises:
         RuntimeError: On API failure.
     """
-    # Wrap bytes in a file-like object — Groq SDK expects a tuple or file path
+    # Wrap bytes in a file-like object — OpenAI SDK expects a tuple or file path
     audio_file = (filename, io.BytesIO(audio_bytes), _mime_type(filename))
 
     try:
@@ -101,7 +97,7 @@ def transcribe(audio_bytes: bytes, filename: str = "audio.wav") -> str:
         return transcript
 
     except Exception as exc:
-        logger.error("STT | Groq Whisper failed: %s", exc)
+        logger.error("STT | OpenAI Whisper failed: %s", exc)
         raise RuntimeError("I didn't catch that. Please try again.") from exc
 
 

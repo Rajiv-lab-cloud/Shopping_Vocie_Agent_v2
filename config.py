@@ -11,15 +11,17 @@ from dotenv import load_dotenv
 # Load .env from project root
 load_dotenv(Path(__file__).parent / ".env")
 
-# Groq
-GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+# OpenAI
+OPENAI_API_KEY: str = os.getenv(
+    "OPENAI_API_KEY", os.getenv("GROQ_API_KEY", "")
+)  # GROQ_API_KEY kept for transition compatibility
 
 # Models
-STT_MODEL: str = os.getenv("STT_MODEL", "whisper-large-v3-turbo")
+STT_MODEL: str = os.getenv("STT_MODEL", "whisper-1")
 STT_LANGUAGE: str = os.getenv("STT_LANGUAGE", "").strip()
-LLM_MODEL: str = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
-TTS_MODEL: str = os.getenv("TTS_MODEL", "canopylabs/orpheus-v1-english")
-TTS_VOICE: str = os.getenv("TTS_VOICE", "default")
+LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
+TTS_MODEL: str = os.getenv("TTS_MODEL", "tts-1")
+TTS_VOICE: str = os.getenv("TTS_VOICE", "alloy")
 
 # RAG
 EMBEDDING_MODEL: str = os.getenv(

@@ -3,12 +3,12 @@ Orchestrator — wires all pipeline stages together.
 
 Pipeline:
   audio bytes
-    → STT (Whisper via Groq)
+    → STT (Whisper via OpenAI)
     → Input Guardrails
     → RAG Retrieval (FAISS + SQLite)
-    → LLM Agent (Groq llama-3.3-70b)
+    → LLM Agent (OpenAI)
     → Output Guardrails
-    → TTS (PlayAI via Groq)
+    → TTS (OpenAI tts-1)
     → structured response dict
 """
 

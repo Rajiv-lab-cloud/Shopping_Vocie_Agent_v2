@@ -14,7 +14,7 @@ Customer Audio (WAV/WebM/MP3)
         │
         ▼
 ┌─────────────────────┐
-│  1. Whisper STT     │  groq: whisper-large-v3-turbo
+│  1. Whisper STT     │  OpenAI: whisper-1
 └──────────┬──────────┘
            │ transcript
            ▼
@@ -30,7 +30,7 @@ Customer Audio (WAV/WebM/MP3)
            │ product_context
            ▼
 ┌─────────────────────┐
-│  4. LLM Agent       │  groq: llama-3.3-70b-versatile (JSON mode)
+│  4. LLM Agent       │  OpenAI: gpt-4o-mini (JSON mode)
 │  System Prompt +    │  → {response_text, intent, ui_actions}
 │  Few-shot examples  │
 └──────────┬──────────┘
@@ -42,7 +42,7 @@ Customer Audio (WAV/WebM/MP3)
            │ validated_output
            ▼
 ┌─────────────────────┐
-│  6. Orpheus TTS     │  groq: canopylabs/orpheus-v1-english
+│  6. Orpheus TTS     │  OpenAI: tts-1
 └──────────┬──────────┘
            │ audio_bytes
            ▼
@@ -57,9 +57,9 @@ Customer Audio (WAV/WebM/MP3)
 
 | Layer       | Technology                              | Description                               |
 |-------------|------------------------------------------|-------------------------------------------|
-| **STT**     | `whisper-large-v3-turbo` via Groq        | Ultra-fast speech-to-text                 |
-| **LLM**     | `llama-3.3-70b-versatile` via Groq       | Reasoning, entity extraction, and JSON    |
-| **TTS**     | `canopylabs/orpheus-v1-english` via Groq | Low-latency voice synthesis               |
+| **STT**     | `whisper-1` via OpenAI        | Ultra-fast speech-to-text                 |
+| **LLM**     | `gpt-4o-mini` via OpenAI       | Reasoning, entity extraction, and JSON    |
+| **TTS**     | `tts-1` via OpenAI              | Low-latency voice synthesis               |
 | **Embeddings** | `all-MiniLM-L6-v2` (384-dim)         | Semantic vector generation                |
 | **Vector DB** | PostgreSQL + `pgvector`                | Advanced hybrid search (semantic + SQL)   |
 | **Platform**| Docker & Docker Compose                  | Containerized database and environment    |
@@ -113,14 +113,14 @@ pip install -r requirements.txt
 copy .env.example .env
 ```
 
-Edit `.env` and set your Groq API key:
+Edit `.env` and set your OpenAI API key:
 
 ```env
-GROQ_API_KEY=gsk_your_groq_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
 DATABASE_URL=postgresql://shopbot:shopbot_password@localhost:5433/shopping_db
 ```
 
-Get a free Groq API key at: https://console.groq.com
+Get a free OpenAI API key at: https://platform.openai.com/api-keys
 
 ### 3. Boot Up the PostgreSQL Database
 
@@ -201,7 +201,7 @@ pytest tests/test_guardrails.py -v
 # RAG tests (needs DB running)
 pytest tests/test_rag.py -v
 
-# API tests (uses TestClient, needs GROQ_API_KEY)
+# API tests (uses TestClient, needs OPENAI_API_KEY)
 pytest tests/test_api.py -v
 
 # Full test suite
@@ -230,24 +230,24 @@ After using either method, re-run the seeder to recalculate embeddings and inser
 
 | Variable         | Default                              | Description                   |
 |------------------|--------------------------------------|-------------------------------|
-| `GROQ_API_KEY`   | *(required)*                         | Groq API key                  |
+| `OPENAI_API_KEY` | *(required)*                         | OpenAI API key                 |
 | `DATABASE_URL`   | *(required)*                         | PostgreSQL connection URL     |
-| `STT_MODEL`      | `whisper-large-v3-turbo`             | Groq Whisper model            |
-| `LLM_MODEL`      | `llama-3.3-70b-versatile`            | Groq LLM model                |
-| `TTS_MODEL`      | `canopylabs/orpheus-v1-english`      | Groq TTS model                |
+| `STT_MODEL`      | `whisper-1`                          | OpenAI Whisper model           |
+| `LLM_MODEL`      | `gpt-4o-mini`                        | OpenAI LLM model               |
+| `TTS_MODEL`      | `tts-1`                              | OpenAI TTS model               |
 | `EMBEDDING_MODEL`| `sentence-transformers/all-MiniLM-L6-v2` | Embedding model           |
 | `PORT`           | `8000`                               | API server port               |
 
 ---
 
-## Groq Models Used
+## OpenAI Models Used
 
-All three AI models are served by [Groq](https://console.groq.com) — the fastest LLM inference platform:
+All three AI models are served by [OpenAI](https://platform.openai.com):
 
 | Model                           | Use          | Speed      |
 |---------------------------------|--------------|------------|
-| `whisper-large-v3-turbo`        | STT          | ~0.2-0.5s  |
-| `llama-3.3-70b-versatile`       | LLM Reasoning| ~0.5-2s    |
-| `canopylabs/orpheus-v1-english` | TTS          | ~0.3-0.8s  |
+| `whisper-1`                    | STT          | ~0.3-1.0s  |
+| `gpt-4o-mini`                  | LLM Reasoning| ~0.8-2.5s  |
+| `tts-1`                        | TTS          | ~0.3-1.0s  |
 
 Total pipeline latency: typically **2–4 seconds** end-to-end.

@@ -1,26 +1,26 @@
 """
-Text-to-Speech module using Groq's PlayAI TTS API.
-Returns WAV audio bytes that can be base64-encoded and sent to the frontend.
+Text-to-Speech module using OpenAI's TTS API.
+Returns MP3 audio bytes that can be base64-encoded and sent to the frontend.
 """
 
 import base64
 import logging
 
-from groq import Groq
+from openai import OpenAI
 
 import config
 
 logger = logging.getLogger(__name__)
 
-_client: Groq | None = None
+_client: OpenAI | None = None
 
 
-def _get_client() -> Groq:
+def _get_client() -> OpenAI:
     global _client
     if _client is None:
-        if not config.GROQ_API_KEY:
-            raise RuntimeError("GROQ_API_KEY is not set.")
-        _client = Groq(api_key=config.GROQ_API_KEY)
+        if not config.OPENAI_API_KEY:
+            raise RuntimeError("OPENAI_API_KEY is not set.")
+        _client = OpenAI(api_key=config.OPENAI_API_KEY)
     return _client
 
 
@@ -55,34 +55,34 @@ def _call_tts(text: str) -> bytes:
             model=config.TTS_MODEL,
             voice=config.TTS_VOICE,
             input=text,
-            response_format="wav",
+            response_format="mp3",
         )
         return response.read()
     except Exception as exc:
-        import groq
+        from openai import RateLimitError
 
-        if isinstance(exc, groq.RateLimitError) or (
+        if isinstance(exc, RateLimitError) or (
             hasattr(exc, "status_code") and exc.status_code == 429
         ):
-            fallbacks = ["canopylabs/orpheus-v1-english", "gTTS"]
+        fallbacks = ["tts-1", "tts-1-hd", "gTTS"]
             if config.TTS_MODEL in fallbacks:
                 idx = fallbacks.index(config.TTS_MODEL)
                 if idx + 1 < len(fallbacks):
                     new_model = fallbacks[idx + 1]
-                    logger.warning(
-                        "TTS rate limit reached for %s. Auto-switching to %s",
-                        config.TTS_MODEL,
-                        new_model,
-                    )
-                    config.TTS_MODEL = new_model
+            logger.warning(
+                "TTS rate limit reached for %s. Auto-switching to %s",
+                config.TTS_MODEL,
+                new_model,
+            )
+            config.TTS_MODEL = new_model
         raise exc
 
 
 def synthesize(text: str) -> bytes:
     """
-    Convert text to speech using Groq TTS.
+    Convert text to speech using OpenAI TTS.
 
-    This API path returns WAV only. If TTS fails, the orchestrator degrades to
+    This API path returns MP3. If TTS fails, the orchestrator degrades to
     text-only instead of returning audio bytes with the wrong MIME type.
     """
     if len(text) > 4000:
@@ -91,7 +91,7 @@ def synthesize(text: str) -> bytes:
     try:
         audio_bytes = _call_tts(text)
     except Exception as exc:
-        logger.error("TTS | Groq TTS failed: %s", exc)
+        logger.error("TTS | OpenAI TTS failed: %s", exc)
         raise RuntimeError(f"Text-to-speech failed: {exc}") from exc
 
     logger.info("TTS | synthesized %d bytes for %d chars", len(audio_bytes), len(text))

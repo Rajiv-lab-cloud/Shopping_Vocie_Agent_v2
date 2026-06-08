@@ -96,7 +96,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Voice Shopping Agent API",
-    description="Voice-enabled AI shopping assistant powered by Groq.",
+    description="Voice-enabled AI shopping assistant powered by OpenAI.",
     version="1.0.0",
     lifespan=lifespan,
 )
