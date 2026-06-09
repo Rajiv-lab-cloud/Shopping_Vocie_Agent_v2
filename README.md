@@ -1,253 +1,167 @@
-# 🛍️ ShopBot — Voice AI Shopping Assistant
+# ShopBot - Voice AI Shopping Assistant
 
-A production-ready voice-enabled AI shopping assistant for e-commerce websites.  
-Customers speak naturally → the system understands intent → retrieves products using vector search → controls the website in real-time → responds with voice.
+ShopBot is a voice-enabled AI shopping assistant for an e-commerce storefront. A customer can speak naturally, the backend transcribes the audio, retrieves matching products from PostgreSQL + pgvector, asks an OpenAI LLM for a structured shopping response, updates the UI with actions, and returns spoken audio.
 
----
+## Current Stack
 
-## Architecture
+| Layer | Technology | Current default |
+| --- | --- | --- |
+| STT | OpenAI audio transcription | `gpt-4o-mini-transcribe` |
+| LLM | OpenAI Chat Completions JSON mode | `gpt-4.1` |
+| TTS | OpenAI speech generation | `gpt-4o-mini-tts` |
+| Embeddings | sentence-transformers | `sentence-transformers/all-MiniLM-L6-v2` |
+| Vector DB | PostgreSQL + pgvector | Docker service on port `5433` |
+| API | FastAPI + Uvicorn | `api.main:app` |
+| Frontend | React + Vite static build | served by FastAPI |
 
-Our robust architecture leverages a **modular, multi-model approach** to ensure a highly resilient, fail-safe scenario. Instead of relying on a single monolithic AI, we split the pipeline across specialized models (STT, LLM, TTS, Embeddings) and use a robust PostgreSQL backend for hybrid search fallbacks.
+## Pipeline
 
-```
-Customer Audio (WAV/WebM/MP3)
-        │
-        ▼
-┌─────────────────────┐
-│  1. OpenAI STT      │  openai: gpt-4o-mini-transcribe
-└──────────┬──────────┘
-           │ transcript
-           ▼
-┌─────────────────────┐
-│  2. Input Guardrail │  Injection detection, PII redaction, length check
-└──────────┬──────────┘
-           │ safe_text
-           ▼
-┌─────────────────────┐
-│  3. RAG Retrieval   │  PostgreSQL (pgvector) + sentence-transformers
-│     (Vector DB)     │  Cosine similarity + structured SQL fallbacks
-└──────────┬──────────┘
-           │ product_context
-           ▼
-┌─────────────────────┐
-│  4. LLM Agent       │  openai: gpt-4.1 (JSON mode)
-│  System Prompt +    │  → {response_text, intent, ui_actions}
-│  Few-shot examples  │
-└──────────┬──────────┘
-           │ structured_output
-           ▼
-┌─────────────────────┐
-│  5. Output Guardrail│  Validates action types, product IDs, brand safety
-└──────────┬──────────┘
-           │ validated_output
-           ▼
-┌─────────────────────┐
-│  6. OpenAI TTS      │  openai: gpt-4o-mini-tts
-└──────────┬──────────┘
-           │ audio_bytes
-           ▼
-┌─────────────────────┐
-│  7. API Response    │  {ui_actions, audio_b64, transcript, response_text}
-└─────────────────────┘
+```text
+Browser audio/text
+  -> OpenAI STT
+  -> input guardrails
+  -> RAG retrieval from PostgreSQL + pgvector
+  -> OpenAI LLM JSON response
+  -> inventory/output guardrails
+  -> OpenAI TTS MP3
+  -> frontend UI actions + spoken response
 ```
 
----
+## Key Behavior
 
-## Tech Stack
-
-| Layer       | Technology                              | Description                               |
-|-------------|------------------------------------------|-------------------------------------------|
-| **STT**     | `gpt-4o-mini-transcribe` via OpenAI      | Speech-to-text                            |
-| **LLM**     | `gpt-4.1` via OpenAI                     | Reasoning, entity extraction, and JSON    |
-| **TTS**     | `gpt-4o-mini-tts` via OpenAI             | Voice synthesis                           |
-| **Embeddings** | `all-MiniLM-L6-v2` (384-dim)         | Semantic vector generation                |
-| **Vector DB** | PostgreSQL + `pgvector`                | Advanced hybrid search (semantic + SQL)   |
-| **Platform**| Docker & Docker Compose                  | Containerized database and environment    |
-| **API**     | FastAPI + Uvicorn                        | High-performance asynchronous API         |
-| **Frontend**| Vanilla HTML/CSS/JS                      | Lightweight, reactive web interface       |
-
----
-
-## Key Features & Highlights
-
-- **Multi-Model Fail-Safe Design**: By separating concerns into highly specialized models (STT, LLM, Embedding, TTS), the pipeline ensures rapid execution and fail-safe redundancy. If semantic search yields no results, the RAG engine automatically falls back to raw SQL price-constraint filtering.
-- **PostgreSQL Vector Database**: Replaced legacy SQLite and FAISS files with an enterprise-grade `pgvector` integration. This enables executing advanced cosine similarity (`<=>`) semantic searches intertwined with standard SQL WHERE clauses (like price caps) in a single, lightning-fast database transaction.
-- **Dockerized Infrastructure**: A seamless `docker-compose.yml` spins up a robust PostgreSQL 16 instance pre-configured with the `pgvector` extension, guaranteeing a reproducible environment anywhere.
-- **Comprehensive Guardrails**: Fully integrated input and output validations. The system actively hunts for prompt injections, redacts PII (emails/phone numbers), clamps out-of-bounds queries, and scrub hallucinated products before they reach the frontend.
-- **Real-Time UI Orchestration**: The AI dynamically generates structured JSON `ui_actions` (like `FILTER_PRODUCTS` or `ADD_TO_CART`) which command the frontend UI state without requiring page reloads.
-- **Smart Real-Time Inventory Tracking**: The system accurately tracks product stock, prevents users from ordering out-of-stock items, handles checkout stock deductions on the backend, and automatically syncs the frontend UI in near real-time via background polling.
-- **Dynamic Synthetic Categories**: Includes an automated LLM-powered data generation pipeline (`scripts/generate_synthetic_data.py`) to easily scale up the catalog with highly diverse, realistic e-commerce products across multiple categories.
-
----
-
-## 🚀 Upgrades from Version 1 to Version 2
-
-Version 2 introduces several major architectural upgrades to improve performance, scalability, and ease of deployment:
-- **Migration to PostgreSQL & pgvector**: Replaced legacy SQLite and FAISS with an enterprise-grade `pgvector` setup. This allows vector similarity searches and SQL filtering in a single query.
-- **Dockerized Backend Infrastructure**: A fully containerized PostgreSQL database configured with pgvector out of the box. No manual DB setup required.
-- **Modern React + Vite Frontend**: Completely initialized a new frontend project using React and Vite, replacing older basic static HTML/JS rendering.
-- **Automated Build Scripts**: The entry point `run.py` now includes `build_frontend()`, which seamlessly installs and builds the React frontend on startup.
-- **Robust Error Handling & Connections**: Enhanced database and Docker availability checks to provide helpful fail-safe warnings if the environment is not running.
-
----
+- Uses `products.json` as the catalog seed source.
+- Stores products, categories, cart, profile, and embeddings in PostgreSQL.
+- Uses pgvector similarity search for product retrieval.
+- Falls back from broad human concepts to concrete catalog terms. For example, `healthy` maps to available grocery/fruit/fresh-product terms, so the assistant can show real items like Apple, Kiwi, Mulberry, or Water if present.
+- Blocks unavailable explicit items before TTS. For example, if the user asks for `ice cream` and no retrieved product actually contains that item, the response becomes out-of-stock and UI actions are cleared.
+- Keeps voice and UI synced by only speaking about products that are backed by DB product IDs.
+- Detects real uploaded audio container type from bytes, so browser WebM audio is sent to OpenAI as WebM instead of being mislabeled as WAV.
 
 ## Quick Start
 
-### 1. Clone & Install
-
-```bash
-cd Shopping_Voice_Agent
-
-# Create virtual environment
-python -m venv .venv
-.venv\Scripts\activate          # Windows
-# source .venv/bin/activate     # Linux/Mac
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 2. Configure Environment
-
-```bash
+```powershell
+cd C:\Users\admin\Desktop\Shopping_Vocie_Agent_v2
 copy .env.example .env
 ```
 
-Edit `.env` and set your OpenAI API key:
+Set your key in `.env`:
 
 ```env
 OPENAI_API_KEY=your_openai_api_key_here
-DATABASE_URL=postgresql://shopbot:shopbot_password@localhost:5433/shopping_db
 ```
 
-Get an OpenAI API key at: https://platform.openai.com
+Start PostgreSQL:
 
-### 3. Boot Up the PostgreSQL Database
-
-Ensure you have Docker installed and running, then spin up the database:
-
-```bash
+```powershell
 docker-compose up -d
 ```
 
-### 4. Start the Application
+Run the app:
 
-```bash
+```powershell
 python run.py
 ```
 
-This will automatically:
-- Check Python versions and dependencies.
-- Initialize the PostgreSQL database schema.
-- Seed the catalog and instantly compute/insert all vector embeddings into Postgres.
-- Start the FastAPI server via uvicorn.
-- Open the frontend in your default browser.
-
----
-
-## API Reference
-
-### `POST /v1/shop` — Main Endpoint
-
-**Request** (`multipart/form-data`):
-
-| Field      | Type   | Required | Description                    |
-|------------|--------|----------|--------------------------------|
-| `audio`    | File   | Either/Or| Audio file (WAV, MP3, WebM)    |
-| `text`     | String | Either/Or| Plain text input for testing   |
-| `skip_tts` | Bool   | No       | Skip TTS synthesis (faster)    |
-
-**Response** (`application/json`):
-
-```json
-{
-  "transcript":    "Show me red shoes under 5000",
-  "response_text": "Here are some great red shoes under ₹5,000!",
-  "intent":        "product_search",
-  "confidence":    0.97,
-  "ui_actions": [
-    {"action": "FILTER_PRODUCTS", "params": {"color": "red", "max_price": 5000}},
-    {"action": "SHOW_PRODUCTS",   "params": {"product_ids": [1, 7]}}
-  ],
-  "audio_b64":  "UklGRiQA...",
-  "latency_ms": {"stt_ms": 420, "rag_ms": 85, "llm_ms": 1200, "tts_ms": 380, "total_ms": 2090}
-}
-```
-
-### UI Action Types
-
-| Action              | Params                                                      |
-|---------------------|-------------------------------------------------------------|
-| `SHOW_PRODUCTS`     | `product_ids: [int]`                                        |
-| `FILTER_PRODUCTS`   | `category, color, max_price, min_price, min_rating, brand`  |
-| `SORT_PRODUCTS`     | `sort_by: "price_asc" \| "price_desc" \| "rating"`         |
-| `NAVIGATE_TO`       | `page: "cart" \| "checkout" \| "category/shoes" \| ...`    |
-| `ADD_TO_CART`       | `product_id: int`                                           |
-| `SHOW_PRODUCT_DETAIL`| `product_id: int`                                          |
-| `CLEAR_FILTERS`     | `{}`                                                        |
-
-### `GET /v1/products` — Product Catalog
-
-Returns active products. Use this to populate your frontend's product grid.
-
----
-
-## Testing
-
-```bash
-# Unit tests (no API key needed for guardrail + RAG tests)
-pytest tests/test_guardrails.py -v
-
-# RAG tests (needs DB running)
-pytest tests/test_rag.py -v
-
-# API tests (uses TestClient, needs OPENAI_API_KEY)
-pytest tests/test_api.py -v
-
-# Full test suite
-pytest tests/ -v
-```
-
----
-
-## Adding Products & Expanding Catalog
-
-There are two ways to add products to your store:
-1. **Manual Entry**: Add new product entries directly to `products.json`.
-2. **AI Synthetic Generation**: Automatically expand your catalog with diverse new categories using the built-in LLM script:
-   ```bash
-   python scripts/generate_synthetic_data.py
-   ```
-
-After using either method, re-run the seeder to recalculate embeddings and insert them into PostgreSQL:
-   ```bash
-   python -m db.seed
-   ```
-
----
+`run.py` checks dependencies, builds the frontend, validates `OPENAI_API_KEY`, initializes the DB schema, seeds products only if the products table is empty, then starts FastAPI.
 
 ## Environment Variables
 
-| Variable         | Default                              | Description                   |
-|------------------|--------------------------------------|-------------------------------|
-| `OPENAI_API_KEY` | *(required)*                         | OpenAI API key                |
-| `DATABASE_URL`   | *(required)*                         | PostgreSQL connection URL     |
-| `STT_MODEL`      | `gpt-4o-mini-transcribe`             | OpenAI transcription model    |
-| `LLM_MODEL`      | `gpt-4.1`                            | OpenAI chat model             |
-| `TTS_MODEL`      | `gpt-4o-mini-tts`                    | OpenAI TTS model              |
-| `EMBEDDING_MODEL`| `sentence-transformers/all-MiniLM-L6-v2` | Embedding model           |
-| `PORT`           | `8000`                               | API server port               |
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | required | OpenAI API key |
+| `STT_MODEL` | `gpt-4o-mini-transcribe` | Speech-to-text model |
+| `LLM_MODEL` | `gpt-4.1` | Chat model for shopping decisions |
+| `TTS_MODEL` | `gpt-4o-mini-tts` | Text-to-speech model |
+| `TTS_VOICE` | `alloy` | OpenAI TTS voice |
+| `DATABASE_URL` | `postgresql://shopbot:shopbot_password@localhost:5433/shopping_db` | PostgreSQL connection |
+| `EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | Product embedding model |
+| `RAG_TOP_K` | `10` | Retrieval compatibility setting |
+| `RAG_TOP_N` | `3` | Number of products passed to the LLM |
+| `PORT` | `8000` | API server port |
 
----
+## API
 
-## OpenAI Models Used
+### `POST /v1/shop`
 
-All three AI models are served by OpenAI:
+Main non-streaming endpoint. Accepts audio or text and returns transcript, response text, UI actions, MP3 audio, and latency timings.
 
-| Model                           | Use          | Speed      |
-|---------------------------------|--------------|------------|
-| `gpt-4o-mini-transcribe`        | STT          | API call   |
-| `gpt-4.1`                       | LLM Reasoning| API call   |
-| `gpt-4o-mini-tts`               | TTS          | API call   |
+```json
+{
+  "transcript": "show me something healthy",
+  "response_text": "Here are a few healthy options from our groceries section.",
+  "intent": "product_search",
+  "confidence": 0.98,
+  "ui_actions": [
+    {"action": "SHOW_PRODUCTS", "params": {"product_ids": [16, 30, 33]}}
+  ],
+  "audio_b64": "...",
+  "latency_ms": {"stt_ms": 420, "rag_ms": 85, "llm_ms": 1200, "tts_ms": 380}
+}
+```
 
-Total pipeline latency: typically **2–4 seconds** end-to-end.
+### `POST /v1/shop/stream`
+
+Server-sent events version of the shopping pipeline.
+
+### `WebSocket /ws/chat`
+
+Realtime chat/voice endpoint used by the frontend.
+
+### Product and Cart Endpoints
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /v1/products` | List active products |
+| `GET /v1/products/by-ids?ids=1,2` | Fetch specific product cards |
+| `GET /v1/categories` | List categories |
+| `GET /v1/cart` | Get cart |
+| `POST /v1/cart/add` | Add item |
+| `POST /v1/cart/update` | Update quantity |
+| `DELETE /v1/cart/{cart_id}` | Remove item |
+| `DELETE /v1/cart` | Clear cart |
+| `POST /v1/cart/checkout` | Generate bill and checkout |
+
+## UI Actions
+
+| Action | Purpose |
+| --- | --- |
+| `SHOW_PRODUCTS` | Show specific product IDs |
+| `FILTER_PRODUCTS` | Apply filters |
+| `NAVIGATE_TO` | Navigate frontend route |
+| `SORT_PRODUCTS` | Sort listing |
+| `ADD_TO_CART` | Add product |
+| `REMOVE_FROM_CART` | Remove product |
+| `UPDATE_CART_QUANTITY` | Change quantity |
+| `SHOW_PRODUCT_DETAIL` | Open product detail |
+| `CLEAR_FILTERS` | Reset filters |
+| `CLEAR_CART` | Empty cart |
+| `CHECKOUT` | Complete checkout |
+| `CLEAR_HISTORY` | Reset conversation memory |
+
+## Product Data
+
+The catalog source file is `products.json`. To reseed after editing it:
+
+```powershell
+python -m db.seed
+```
+
+The seeder recalculates embeddings and inserts products into PostgreSQL. The active database currently uses PostgreSQL with `pgvector`, not local FAISS files.
+
+## Important Notes
+
+- Do not reintroduce Groq SDK/config unless intentionally migrating providers again.
+- OpenAI TTS returns MP3 and the frontend expects `audio/mp3` payloads.
+- Browser microphone recordings are usually WebM/Opus; `agent/stt.py` detects the container before sending audio to OpenAI.
+- Keep DB schema files stable unless intentionally doing a database migration.
+- If the assistant speaks about a product, the response must include matching UI actions with real DB product IDs.
+
+## Tests
+
+```powershell
+pytest tests/test_guardrails.py -v
+pytest tests/test_rag.py -v
+pytest tests/ -v
+```
+
+Some tests require Docker/PostgreSQL and API key configuration.
